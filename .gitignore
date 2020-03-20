@@ -1,0 +1,14 @@
+.DS_Store
+tensorboard.txt
+*.pyc
+__pycache__/
+tensorboards/
+real_state/
+pretrained/
+logs/
+database/
+.idea/
+submit.sh
+plot.py
+flake8.log
+.ipynb_checkpoints
