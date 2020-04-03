@@ -12,10 +12,10 @@ MIT, Adobe Research, SJTU<br>
 In CVPR 2020.  
 
 ## Demos
-<img src='imgs/demo_xavier.gif' align="left" width=512>
-<br>
 
-<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
+<p align="center">
+  <img src="imgs/demo_xavier.gif" width=600>
+</p>
 
 ## Overview
 
