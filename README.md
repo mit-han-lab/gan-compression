@@ -12,10 +12,10 @@ MIT, Adobe Research, SJTU<br>
 In CVPR 2020.  
 
 ## Demos
+<img src='imgs/demo_xavier.gif' align="left" width=512>
+<br>
 
-<p align="center">
-  <img src="imgs/demo_xavier.gif" width=600>
-</p>
+<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
 
 ## Overview
 
@@ -141,6 +141,14 @@ python datasets/prepare_cityscapes_dataset.py \
 ```
 
 You will get a preprocessed dataset in `database/cityscapes` and a mapping table (used to compute mAP) in `dataset/table.txt`.
+
+To support mAP computation, you need to download a pretrained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. Then you can test our compressed models on cityscapes by running
+
+```bash
+bash scripts/pix2pix/cityscapes/test_compressed.sh
+```
+
+after you have downloaded our compressed models.
 
 ### FID Computation
 
