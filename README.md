@@ -66,8 +66,8 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 * Get the statistical information for the ground-truth images for your dataset to compute FID. We provide pre-prepared real statistic information for several datasets. For example,
 
   ```shell
-  bash ./datasets/download_real_stat.sh horse2zebra A
-  bash ./datasets/download_real_stat.sh horse2zebra B
+  bash datasets/download_real_stat.sh horse2zebra A
+  bash datasets/download_real_stat.sh horse2zebra B
   ```
 
 #### Apply a Pre-trained Model
@@ -98,7 +98,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 * Download the pix2pix dataset (e.g., edges2shoes).
 
   ```shell
-  bash ./datasets/download_pix2pix_dataset.sh edges2shoes-r
+  bash datasets/download_pix2pix_dataset.sh edges2shoes-r
   ```
 
 * Get the statistical information for the ground-truth images for your dataset to compute FID. We provide pre-prepared real statistics for several datasets. For example,
@@ -142,7 +142,13 @@ python datasets/prepare_cityscapes_dataset.py \
 
 You will get a preprocessed dataset in `database/cityscapes` and a mapping table (used to compute mAP) in `dataset/table.txt`.
 
-To support mAP computation, you need to download a pretrained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. Then you can test our compressed models on cityscapes by running
+To support mAP computation, you need to download a pretrained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. You all need to convert the original segmentation label ids in the vanilla version of Cityscapes dataset to one of 19 training ids.
+
+```
+python datasets/get_trainIds.py database/cityscapes-origin/gtFine/
+```
+
+Then you can test our compressed models on cityscapes by running
 
 ```bash
 bash scripts/pix2pix/cityscapes/test_compressed.sh
