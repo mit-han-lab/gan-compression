@@ -51,7 +51,7 @@ class TestModel(BaseModel):
         for p in netG.parameters():
             params += p.numel()
         if verbose:
-            print('MACs: %d\t' % macs, flush=True)
+            print('MACs: %.3fG\tParams: %.3fM' % (macs / 1e9, params / 1e6), flush=True)
         return macs, params
 
     def test(self, config=None):
