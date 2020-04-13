@@ -1,5 +1,5 @@
 # GAN Compression
-### [paper](https://arxiv.org/abs/2003.08936) | [demo](https://tinyurl.com/r474uca) 
+### [paper](https://arxiv.org/abs/2003.08936) | [demo](https://tinyurl.com/r474uca)
 
 **[NEW!]** The [tutorial](docs/training_tutorial.md) of compression is released! Check the [overview](docs/overview.md) for better understanding our codebase.
 
@@ -153,7 +153,7 @@ after you have downloaded our compressed models.
 
 ### [Training](docs/training_tutorial.md)
 
-Please refer to our [tutorial](docs/training_tutorial.md) of reproducing our results.
+Please refer to our training [tutorial](docs/training_tutorial.md) on how to train models on our datasets and your own.
 
 ### FID Computation
 
