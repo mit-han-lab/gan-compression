@@ -1,5 +1,5 @@
 # GAN Compression
-### [paper](https://arxiv.org/abs/2003.08936) | [demo](https://tinyurl.com/r474uca)
+### [paper](https://arxiv.org/abs/2003.08936) | [demo](https://tinyurl.com/r474uca) 
 
 
 **[NEW!]** The PyTorch implementation of a general conditional GAN Compression framework is released.  
@@ -130,31 +130,30 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 
 #### Cityscapes Dataset
 
-For the Cityscapes dataset, we cannot provide it due to license issue. Please download the dataset from https://cityscapes-dataset.com and use the script `datasets/prepare_cityscapes_dataset.py` to preprocess it. You need to download `gtFine_trainvaltest.zip` and `leftImg8bit_trainvaltest.zip` and unzip them in the same folder. For example, you may put `gtFine` and `leftImg8bit` in `database/cityscapes-origin`. You could prepare the dataset with the following command:
+For the Cityscapes dataset, we cannot provide it due to license issue. Please download the dataset from https://cityscapes-dataset.com and use the script `datasets/prepare_cityscapes_dataset.py` to preprocess it. You need to download `gtFine_trainvaltest.zip` and `leftImg8bit_trainvaltest.zip` and unzip them in the same folder. For example, you may put `gtFine` and `leftImg8bit` in `database/cityscapes-origin`. You need to prepare the dataset with the following commands:
 
 ```shell
+python datasets/get_trainIds.py database/cityscapes-origin/gtFine/
 python datasets/prepare_cityscapes_dataset.py \
 --gtFine_dir database/cityscapes-origin/gtFine \
 --leftImg8bit_dir database/cityscapes-origin/leftImg8bit \
 --output_dir database/cityscapes \
---table_path ./dataset/table.txt
+--table_path datasets/table.txt
 ```
 
 You will get a preprocessed dataset in `database/cityscapes` and a mapping table (used to compute mAP) in `dataset/table.txt`.
 
-To support mAP computation, you need to download a pretrained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. You all need to convert the original segmentation label ids in the vanilla version of Cityscapes dataset to one of 19 training ids.
-
-```
-python datasets/get_trainIds.py database/cityscapes-origin/gtFine/
-```
-
-Then you can test our compressed models on cityscapes by running
+To support mAP computation, you need to download a pre-trained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. Then you can test our compressed models on cityscapes by running
 
 ```bash
 bash scripts/pix2pix/cityscapes/test_compressed.sh
 ```
 
 after you have downloaded our compressed models.
+
+### [Training](docs/training_tutorial.md)
+
+Please refer to our [tutorial](docs/training_tutorial.md) of reproducing our results.
 
 ### FID Computation
 
@@ -166,6 +165,10 @@ python get_real_stat.py \
 --output_path real_stat/edges2shoes-r_B.npz \
 --direction AtoB
   ```
+
+# [Code Structure](./docs/overview.md)
+
+To help users better understand and use our code, we briefly overview the functionality and implementation of each package and each module.
 
 ## Citation
 

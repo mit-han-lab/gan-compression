@@ -70,6 +70,10 @@ def get_configs(config_name):
         return ResnetConfigs(n_channels=[[32, 24, 16], [32, 24, 16], [32, 24, 16],
                                          [32, 24, 16], [32, 24, 16], [32, 24, 16],
                                          [32, 24, 16], [32, 24, 16]])
+    elif config_name == 'debug':
+        return ResnetConfigs(n_channels=[[48, 32], [48, 32], [48, 40, 32],
+                                         [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                         [48], [48]])
     elif config_name == 'test':
         return ResnetConfigs(n_channels=[[8], [6, 8], [6, 8],
                                          [8], [8], [8],

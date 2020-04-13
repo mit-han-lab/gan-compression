@@ -133,3 +133,4 @@ if __name__ == '__main__':
     os.makedirs(os.path.dirname(opt.output_path), exist_ok=True)
     with open(opt.output_path, 'wb') as f:
         pickle.dump(results, f)
+    print('Successfully finish searching!!!', flush=True)
