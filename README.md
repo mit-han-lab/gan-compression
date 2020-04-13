@@ -1,6 +1,7 @@
 # GAN Compression
 ### [paper](https://arxiv.org/abs/2003.08936) | [demo](https://tinyurl.com/r474uca) 
 
+**[NEW!]** The [training tutorial](docs/training_tutorial.md) of reproducing our results is released! Check the [overview](docs/overview.md) for better understanding our codebase.
 
 **[NEW!]** The PyTorch implementation of a general conditional GAN Compression framework is released.  
 
