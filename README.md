@@ -151,7 +151,7 @@ bash scripts/pix2pix/cityscapes/test_compressed.sh
 
 after you have downloaded our compressed models.
 
-### [Training](docs/training_tutorial.md)
+## [Training](docs/training_tutorial.md)
 
 Please refer to our training [tutorial](docs/training_tutorial.md) on how to train models on our datasets and your own.
 
@@ -166,7 +166,7 @@ python get_real_stat.py \
 --direction AtoB
   ```
 
-# [Code Structure](./docs/overview.md)
+## [Code Structure](./docs/overview.md)
 
 To help users better understand and use our code, we briefly overview the functionality and implementation of each package and each module.
 

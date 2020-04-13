@@ -17,7 +17,7 @@ Below we show the full pipeline for compressing pix2pix and cycleGAN models. **W
 
 In fact, several steps including "Train a MobileNet Teacher Model", "Pre-distillation", and "Fine-tuning the Best Model" may be omitted from the whole pipeline. We will provide a simplified pipeline soon.
 
-#### Pix2pix
+## Pix2pix Model Compression
 
 We will show the whole pipeline on `edges2shoes-r` dataset. You could change the dataset name to other datasets (`map2sat` and `cityscapes`).
 
@@ -121,7 +121,7 @@ bash scripts/pix2pix/edges2shoes-r/export.sh 32_32_48_32_48_48_16_16
 
 For the Cityscapes dataset, you need to specify additional options to support mAP evaluation while training. Please refer to the scripts in [scripts/pix2pix/cityscapes](../scripts/pix2pix/cityscapes) for more details.
 
-#### CycleGAN
+## CycleGAN Model Compression
 
 The whole pipeline is almost identical to pix2pix. We will show the pipeline on `horse2zebra` dataset.
 
