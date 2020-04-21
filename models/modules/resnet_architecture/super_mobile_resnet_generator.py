@@ -3,11 +3,68 @@ import functools
 from torch import nn
 
 from models.modules.super_modules import SuperConvTranspose2d, SuperConv2d, SuperSeparableConv2d
+from models.networks import BaseNetwork
 
-scale_factor = 2
+
+class SuperMobileResnetBlock(nn.Module):
+    def __init__(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
+        super(SuperMobileResnetBlock, self).__init__()
+        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, dropout_rate, use_bias)
+
+    def build_conv_block(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
+        conv_block = []
+        p = 0
+        if padding_type == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+        elif padding_type == 'replicate':
+            conv_block += [nn.ReplicationPad2d(1)]
+        elif padding_type == 'zero':
+            p = 1
+        else:
+            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+
+        conv_block += [
+            SuperSeparableConv2d(in_channels=dim, out_channels=dim,
+                                 kernel_size=3, padding=p, stride=1),
+            norm_layer(dim),
+            nn.ReLU(True)
+        ]
+        conv_block += [nn.Dropout(dropout_rate)]
+
+        p = 0
+        if padding_type == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+        elif padding_type == 'replicate':
+            conv_block += [nn.ReplicationPad2d(1)]
+        elif padding_type == 'zero':
+            p = 1
+        else:
+            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+
+        conv_block += [
+            SuperSeparableConv2d(in_channels=dim, out_channels=dim,
+                                 kernel_size=3, padding=p, stride=1),
+            norm_layer(dim)
+        ]
+
+        return nn.Sequential(*conv_block)
+
+    def forward(self, input, config):
+        x = input
+        cnt = 0
+        for module in self.conv_block:
+            if isinstance(module, SuperSeparableConv2d):
+                if cnt == 1:
+                    config['channel'] = input.size(1)
+                x = module(x, config)
+                cnt += 1
+            else:
+                x = module(x)
+        out = input + x
+        return out
 
 
-class SuperMobileResnetGenerator(nn.Module):
+class SuperMobileResnetGenerator(BaseNetwork):
     def __init__(self, input_nc, output_nc, ngf, norm_layer=nn.BatchNorm2d, dropout_rate=0, n_blocks=6,
                  padding_type='reflect'):
         assert n_blocks >= 0
@@ -104,61 +161,3 @@ class SuperMobileResnetGenerator(nn.Module):
             else:
                 x = module(x)
         return x
-
-
-class SuperMobileResnetBlock(nn.Module):
-    def __init__(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
-        super(SuperMobileResnetBlock, self).__init__()
-        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, dropout_rate, use_bias)
-
-    def build_conv_block(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
-        conv_block = []
-        p = 0
-        if padding_type == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
-        elif padding_type == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
-        elif padding_type == 'zero':
-            p = 1
-        else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
-
-        conv_block += [
-            SuperSeparableConv2d(in_channels=dim, out_channels=dim,
-                                 kernel_size=3, padding=p, stride=1),
-            norm_layer(dim),
-            nn.ReLU(True)
-        ]
-        conv_block += [nn.Dropout(dropout_rate)]
-
-        p = 0
-        if padding_type == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
-        elif padding_type == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
-        elif padding_type == 'zero':
-            p = 1
-        else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
-
-        conv_block += [
-            SuperSeparableConv2d(in_channels=dim, out_channels=dim,
-                                 kernel_size=3, padding=p, stride=1),
-            norm_layer(dim)
-        ]
-
-        return nn.Sequential(*conv_block)
-
-    def forward(self, input, config):
-        x = input
-        cnt = 0
-        for module in self.conv_block:
-            if isinstance(module, SuperSeparableConv2d):
-                if cnt == 1:
-                    config['channel'] = input.size(1)
-                x = module(x, config)
-                cnt += 1
-            else:
-                x = module(x)
-        out = input + x
-        return out

@@ -21,8 +21,8 @@ def save_images(webpage, visuals, image_path, opt):
     def convert_visuals_to_numpy(visuals):
         for key, t in visuals.items():
             tile = opt.batch_size > 8
-            if 'input_label' == key:
-                t = util.tensor2label(t, opt.label_nc + 2, tile=tile)
+            if key == 'labels':
+                t = util.tensor2label(t, opt.input_nc + 2, tile=tile)
             else:
                 t = util.tensor2im(t, tile=tile)
             visuals[key] = t

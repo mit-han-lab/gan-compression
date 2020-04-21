@@ -1,6 +1,7 @@
 from torch import nn
 
-from models.modules.resnet_architecture.mobile_resnet_generator import MobileResnetBlock, SeparableConv2d
+from models.modules.resnet_architecture.mobile_resnet_generator import MobileResnetBlock
+from models.modules.mobile_modules import SeparableConv2d
 from models.modules.resnet_architecture.resnet_generator import ResnetBlock
 
 

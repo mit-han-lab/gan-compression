@@ -34,10 +34,10 @@ class TestModel(BaseModel):
         self.fake_B = self.netG(self.real_A)
 
     def optimize_parameters(self):
-        assert False, 'This searcher is only for evaluation, you cannot optimize the parameters!!!'
+        assert False, 'This model is only for testing, you cannot optimize the parameters!!!'
 
     def save_networks(self, epoch):
-        assert False, 'This searcher is only for evaluation!!!'
+        assert False, 'This model is only for testing!!!'
 
     def profile(self, config=None, verbose=True):
         netG = self.netG
@@ -59,7 +59,7 @@ class TestModel(BaseModel):
             self.forward(config)
 
     def get_current_losses(self):
-        assert False, 'This searcher is only for evaluation!!!'
+        assert False, 'This model is only for testing!!!'
 
     def update_learning_rate(self, f=None):
-        assert False, 'This searcher is only for evaluation!!!'
+        assert False, 'This model is only for testing!!!'

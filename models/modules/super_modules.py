@@ -1,5 +1,9 @@
-import torch.nn as nn
+import torch
+from torch import nn
 from torch.nn import functional as F
+
+from .sync_batchnorm import SynchronizedBatchNorm2d
+from .sync_batchnorm.batchnorm import _ChildMessage, _sum_ft, _unsqueeze_ft
 
 
 class SuperConv2d(nn.Conv2d):
@@ -79,3 +83,60 @@ class SuperSeparableConv2d(nn.Module):
             bias = None
         x = F.conv2d(x, weight, bias, conv.stride, conv.padding, conv.dilation, conv.groups)
         return x
+
+
+class SuperSynchronizedBatchNorm2d(SynchronizedBatchNorm2d):
+    def __init__(self, num_features, eps=1e-5, momentum=0.1, affine=True):
+        super(SuperSynchronizedBatchNorm2d, self).__init__(num_features, eps, momentum, affine)
+
+    def forward(self, x, config={'calibrate_bn': False}):
+        # If it is not parallel computation or is in evaluation mode, use PyTorch's implementation.
+        # return input
+        input = x
+        if x.shape[1] != self.num_features:
+            padding = torch.zeros([x.shape[0], self.num_features - x.shape[1], x.shape[2], x.shape[3]], device=x.device)
+            input = torch.cat([input, padding], dim=1)
+        calibrate_bn = config['calibrate_bn']
+        if not (self._is_parallel and self.training):
+            if calibrate_bn:
+                ret = F.batch_norm(
+                    input, self.running_mean, self.running_var, self.weight, self.bias,
+                    self.training, 1, self.eps)
+            else:
+                ret = F.batch_norm(
+                    input, self.running_mean, self.running_var, self.weight, self.bias,
+                    self.training, self.momentum, self.eps)
+            return ret[:, :x.shape[1]]
+
+        momentum = self.momentum
+        if calibrate_bn:
+            self.momentum = 1
+        # print('another route')
+
+        # Resize the input to (B, C, -1).
+        input_shape = input.size()
+        input = input.view(input.size(0), self.num_features, -1)
+
+        # Compute the sum and square-sum.
+        sum_size = input.size(0) * input.size(2)
+        input_sum = _sum_ft(input)
+        input_ssum = _sum_ft(input ** 2)
+
+        # Reduce-and-broadcast the statistics.
+        if self._parallel_id == 0:
+            mean, inv_std = self._sync_master.run_master(_ChildMessage(input_sum, input_ssum, sum_size))
+        else:
+            mean, inv_std = self._slave_pipe.run_slave(_ChildMessage(input_sum, input_ssum, sum_size))
+
+        # Compute the output.
+        if self.affine:
+            # MJY:: Fuse the multiplication for speed.
+            output = (input - _unsqueeze_ft(mean)) * _unsqueeze_ft(inv_std * self.weight) + _unsqueeze_ft(self.bias)
+        else:
+            output = (input - _unsqueeze_ft(mean)) * _unsqueeze_ft(inv_std)
+
+        # Reshape it.
+        if calibrate_bn:
+            self.momentum = momentum
+        output = output.view(input_shape)
+        return output[:, :x.shape[1]]

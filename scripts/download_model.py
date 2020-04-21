@@ -9,6 +9,9 @@ def check(opt):
         assert opt.task in ['edges2shoes-r', 'map2sat', 'cityscapes']
     elif opt.model == 'cycle_gan':
         assert opt.task in ['horse2zebra']
+    elif opt.model == 'gaugan':
+        assert opt.task in ['cityscapes']
+        assert opt.stage in ['compressed', 'full']
     else:
         raise NotImplementedError('Unsupported model [%s]!' % opt.model)
 
@@ -26,7 +29,7 @@ if __name__ == '__main__':
                         choices=['full', 'mobile', 'distill', 'supernet', 'finetune', 'compressed'],
                         help='specify the stage you want to download')
     parser.add_argument('--model', type=str, default='pix2pix',
-                        choices=['pix2pix', 'cycle_gan'],
+                        choices=['pix2pix', 'cycle_gan', 'gaugan'],
                         help='specify the model you want to download')
     parser.add_argument('--task', type=str, default='horse2zebra',
                         choices=['horse2zebra', 'edges2shoes-r', 'map2sat', 'cityscapes'],

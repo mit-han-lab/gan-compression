@@ -107,7 +107,7 @@ class SegList(Dataset):
                 table.append(line.strip().split(' '))
         for name in self.names:
             for item in table:
-                if item[0] == name:
+                if item[0] == name or item[2][:-len('.png')].endswith(name):
                     self.label_list.append(item[1])
                     break
         assert len(self.label_list) == len(self.names)

@@ -6,12 +6,19 @@ from torch.nn import init
 from torch.optim import lr_scheduler
 
 from configs import decode_config
-from .modules.discriminators import NLayerDiscriminator, PixelDiscriminator
 
 
 ###############################################################################
 # Helper Functions
 ###############################################################################
+
+class BaseNetwork(nn.Module):
+    def __init__(self):
+        super(BaseNetwork, self).__init__()
+
+    @staticmethod
+    def modify_commandline_options(parser, is_train):
+        return parser
 
 
 class Identity(nn.Module):
@@ -100,8 +107,10 @@ def init_weights(net, init_type='normal', init_gain=0.02):
                 init.constant_(m.bias.data, 0.0)
         elif classname.find(
                 'BatchNorm2d') != -1:  # BatchNorm Layer's weight is not a matrix; only normal distribution applies.
-            init.normal_(m.weight.data, 1.0, init_gain)
-            init.constant_(m.bias.data, 0.0)
+            if hasattr(m, 'weight') and m.weight is not None:
+                init.normal_(m.weight.data, 1.0, init_gain)
+            if hasattr(m, 'bias') and m.weight is not None:
+                init.constant_(m.bias.data, 0.0)
 
     print('initialize network with %s' % init_type)
     net.apply(init_func)  # apply the initialization function <init_func>
@@ -128,23 +137,34 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', dropout_rate=0,
              init_type='normal', init_gain=0.02, gpu_ids=[], opt=None):
     norm_layer = get_norm_layer(norm_type=norm)
     if netG == 'resnet_9blocks':
-        from models.modules.resnet_architecture.resnet_generator import ResnetGenerator
+        from .modules.resnet_architecture.resnet_generator import ResnetGenerator
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer,
                               dropout_rate=dropout_rate, n_blocks=9)
     elif netG == 'mobile_resnet_9blocks':
-        from models.modules.resnet_architecture.mobile_resnet_generator import MobileResnetGenerator
+        from .modules.resnet_architecture.mobile_resnet_generator import MobileResnetGenerator
         net = MobileResnetGenerator(input_nc, output_nc, ngf=ngf, norm_layer=norm_layer,
                                     dropout_rate=dropout_rate, n_blocks=9)
     elif netG == 'super_mobile_resnet_9blocks':
-        from models.modules.resnet_architecture.super_mobile_resnet_generator import SuperMobileResnetGenerator
+        from .modules.resnet_architecture.super_mobile_resnet_generator import SuperMobileResnetGenerator
         net = SuperMobileResnetGenerator(input_nc, output_nc, ngf=ngf, norm_layer=norm_layer,
                                          dropout_rate=dropout_rate, n_blocks=9)
     elif netG == 'sub_mobile_resnet_9blocks':
-        from models.modules.resnet_architecture.sub_mobile_resnet_generator import SubMobileResnetGenerator
+        from .modules.resnet_architecture.sub_mobile_resnet_generator import SubMobileResnetGenerator
         assert opt.config_str is not None
         config = decode_config(opt.config_str)
         net = SubMobileResnetGenerator(input_nc, output_nc, config, norm_layer=norm_layer,
                                        dropout_rate=dropout_rate, n_blocks=9)
+    elif netG == 'spade':
+        from .modules.spade_architecture.spade_generator import SPADEGenerator
+        net = SPADEGenerator(opt)
+    elif netG == 'mobile_spade':
+        from .modules.spade_architecture.mobile_spade_generator import MobileSPADEGenerator
+        net = MobileSPADEGenerator(opt)
+    elif netG == 'sub_mobile_spade':
+        from .modules.spade_architecture.sub_mobile_spade_generator import SubMobileSPADEGenerator
+        assert opt.config_str is not None
+        config = decode_config((opt.config_str))
+        net = SubMobileSPADEGenerator(opt, config)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
     return init_net(net, init_type, init_gain, gpu_ids)
@@ -180,13 +200,65 @@ def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal'
 
     The discriminator has been initialized by <init_net>. It uses Leakly RELU for non-linearity.
     """
-    net = None
     norm_layer = get_norm_layer(norm_type=norm)
-
     if netD == 'n_layers':
+        from .modules.discriminators import NLayerDiscriminator
         net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
     elif netD == 'pixel':  # classify if each pixel is real or fake
+        from .modules.discriminators import PixelDiscriminator
         net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer)
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
     return init_net(net, init_type, init_gain, gpu_ids)
+
+
+def get_netG_cls(netG):
+    if netG == 'resnet_9blocks':
+        from .modules.resnet_architecture.resnet_generator import ResnetGenerator
+        return ResnetGenerator
+    elif netG == 'mobile_resnet_9blocks':
+        from .modules.resnet_architecture.mobile_resnet_generator import MobileResnetGenerator
+        return MobileResnetGenerator
+    elif netG == 'super_mobile_resnet_9blocks':
+        from .modules.resnet_architecture.super_mobile_resnet_generator import SuperMobileResnetGenerator
+        return SuperMobileResnetGenerator
+    elif netG == 'sub_mobile_resnet_9blocks':
+        from .modules.resnet_architecture.sub_mobile_resnet_generator import SubMobileResnetGenerator
+        return SubMobileResnetGenerator
+    elif netG == 'spade':
+        from .modules.spade_architecture.spade_generator import SPADEGenerator
+        return SPADEGenerator
+    elif netG == 'mobile_spade':
+        from .modules.spade_architecture.mobile_spade_generator import MobileSPADEGenerator
+        return MobileSPADEGenerator
+    elif netG == 'sub_mobile_spade':
+        from .modules.spade_architecture.sub_mobile_spade_generator import SubMobileSPADEGenerator
+        return SubMobileSPADEGenerator
+    else:
+        raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
+
+
+def get_netD_cls(netD):
+    if netD == 'n_layers':
+        from .modules.discriminators import NLayerDiscriminator
+        return NLayerDiscriminator
+    elif netD == 'pixel':  # classify if each pixel is real or fake
+        from .modules.discriminators import PixelDiscriminator
+        return PixelDiscriminator
+    elif netD == 'Multiscale':
+        from .modules.discriminators import MultiscaleDiscriminator
+        return MultiscaleDiscriminator
+    else:
+        raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
+
+
+def modify_commandline_options(parser, is_train):
+    opt, _ = parser.parse_known_args()
+
+    netG_cls = get_netG_cls(opt.netG)
+    parser = netG_cls.modify_commandline_options(parser, is_train)
+    if is_train:
+        netD_cls = get_netD_cls(opt.netD)
+        parser = netD_cls.modify_commandline_options(parser, is_train)
+
+    return parser

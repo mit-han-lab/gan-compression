@@ -49,6 +49,8 @@ class BaseOptions:
         parser.add_argument('--batch_size', type=int, default=1, help='input batch size')
         parser.add_argument('--load_size', type=int, default=286, help='scale images to this size')
         parser.add_argument('--crop_size', type=int, default=256, help='then crop to this size')
+        parser.add_argument('--aspect_ratio', type=float, default=1.0,
+                            help='The ratio width/height. The final height of the load image will be crop_size/aspect_ratio')
         parser.add_argument('--max_dataset_size', type=int, default=-1,
                             help='Maximum number of samples allowed per dataset. If the dataset directory contains more than max_dataset_size, only a subset is loaded.')
         parser.add_argument('--preprocess', type=str, default='resize_and_crop',
@@ -128,6 +130,11 @@ class BaseOptions:
     def parse(self, verbose=True):
         opt = self.gather_options()
         opt.isTrain = self.isTrain  # train or test
+
+        if hasattr(opt, 'contain_dontcare_label') and hasattr(opt, 'no_instance'):
+            opt.semantic_nc = opt.input_nc + \
+                              (1 if opt.contain_dontcare_label else 0) + \
+                              (0 if opt.no_instance else 1)
 
         if verbose:
             self.print_options(opt)

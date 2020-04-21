@@ -82,7 +82,7 @@ def get_params(opt, size):
     return {'crop_pos': (x, y), 'flip': flip, 'crop_size': (crop_w, crop_h)}
 
 
-def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True):
+def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, toTensor=True, normalized=True):
     transform_list = []
     if grayscale:
         transform_list.append(transforms.Grayscale(1))
@@ -91,29 +91,32 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
         transform_list.append(transforms.Resize(osize, method))
     elif 'scale_width' in opt.preprocess:
         transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.load_size, method)))
-
     if 'crop' in opt.preprocess:
         if params is None:
             transform_list.append(transforms.RandomCrop(opt.crop_size))
         else:
             transform_list.append(transforms.Lambda(lambda img: __crop(img, params['crop_pos'], params['crop_size'])))
-
     if opt.preprocess == 'none':
         transform_list.append(transforms.Lambda(lambda img: __make_power_2(img, base=4, method=method)))
-
     if not opt.no_flip:
         if params is None:
             transform_list.append(transforms.RandomHorizontalFlip())
         elif params['flip']:
             transform_list.append(transforms.Lambda(lambda img: __flip(img, params['flip'])))
 
-    if convert:
+    if toTensor:
         transform_list += [transforms.ToTensor()]
+
+    if normalized:
         if grayscale:
             transform_list += [transforms.Normalize((0.5,), (0.5,))]
         else:
             transform_list += [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
     return transforms.Compose(transform_list)
+
+
+def __resize(img, w, h, method=Image.BICUBIC):
+    return img.resize((w, h), method)
 
 
 def __make_power_2(img, base, method=Image.BICUBIC):

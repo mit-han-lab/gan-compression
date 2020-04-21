@@ -3,12 +3,31 @@ Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
 Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 """
 
+import importlib
 import os
+import re
 
 import numpy as np
 import torch
 from PIL import Image
 from torch import nn
+
+
+def atoi(text):
+    return int(text) if text.isdigit() else text
+
+
+def natural_keys(text):
+    '''
+    alist.sort(key=natural_keys) sorts in human order
+    http://nedbatchelder.com/blog/200712/human_sorting.html
+    (See Toothy's implementation in the comments)
+    '''
+    return [atoi(c) for c in re.split('(\d+)', text)]
+
+
+def natural_sort(items):
+    items.sort(key=natural_keys)
 
 
 def tile_images(imgs, picturesPerRow=4):
@@ -114,19 +133,6 @@ def save_image(image_numpy, image_path, create_dir=False):
     image_pil.save(image_path.replace('.jpg', '.png'))
 
 
-def mkdirs(paths):
-    if isinstance(paths, list) and not isinstance(paths, str):
-        for path in paths:
-            mkdir(path)
-    else:
-        mkdir(paths)
-
-
-def mkdir(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
-
-
 def save_network(net, label, epoch, opt):
     save_filename = '%s_net_%s.pth' % (epoch, label)
     os.makedirs(os.path.join(opt.log_dir, 'checkpoints'), exist_ok=True)
@@ -134,20 +140,6 @@ def save_network(net, label, epoch, opt):
     torch.save(net.cpu().state_dict(), save_path)
     if len(opt.gpu_ids) and torch.cuda.is_available():
         net.cuda()
-
-
-def __patch_instance_norm_state_dict(state_dict, module, keys, i=0):
-    key = keys[i]
-    if i + 1 == len(keys):  # at the end, pointing to a parameter/buffer
-        if module.__class__.__name__.startswith('InstanceNorm') and \
-                (key == 'running_mean' or key == 'running_var'):
-            if getattr(module, key) is None:
-                state_dict.pop('.'.join(keys))
-        if module.__class__.__name__.startswith('InstanceNorm') and \
-                (key == 'num_batches_tracked'):
-            state_dict.pop('.'.join(keys))
-    else:
-        __patch_instance_norm_state_dict(state_dict, getattr(module, key), keys, i + 1)
 
 
 def load_network(net, load_path, verbose=True):
@@ -229,3 +221,19 @@ def set_requires_grad(nets, requires_grad=False):
         if net is not None:
             for param in net.parameters():
                 param.requires_grad = requires_grad
+
+
+def find_class_in_module(target_cls_name, module):
+    target_cls_name = target_cls_name.replace('_', '').lower()
+    clslib = importlib.import_module(module)
+    cls = None
+    for name, clsobj in clslib.__dict__.items():
+        if name.lower() == target_cls_name:
+            cls = clsobj
+
+    if cls is None:
+        print("In %s, there should be a class whose name matches %s in lowercase without underscore(_)" % (
+            module, target_cls_name))
+        exit(0)
+
+    return cls

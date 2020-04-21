@@ -2,10 +2,59 @@ import functools
 
 from torch import nn
 
-from .mobile_resnet_generator import SeparableConv2d
+from models.modules.mobile_modules import SeparableConv2d
+from models.networks import BaseNetwork
 
 
-class SubMobileResnetGenerator(nn.Module):
+class MobileResnetBlock(nn.Module):
+    def __init__(self, ic, oc, padding_type, norm_layer, dropout_rate, use_bias):
+        super(MobileResnetBlock, self).__init__()
+        self.conv_block = self.build_conv_block(ic, oc, padding_type, norm_layer, dropout_rate, use_bias)
+
+    def build_conv_block(self, ic, oc, padding_type, norm_layer, dropout_rate, use_bias):
+        conv_block = []
+        p = 0
+        if padding_type == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+        elif padding_type == 'replicate':
+            conv_block += [nn.ReplicationPad2d(1)]
+        elif padding_type == 'zero':
+            p = 1
+        else:
+            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+
+        conv_block += [
+            SeparableConv2d(in_channels=ic, out_channels=oc,
+                            kernel_size=3, padding=p, stride=1),
+            norm_layer(oc),
+            nn.ReLU(True)
+        ]
+        conv_block += [nn.Dropout(dropout_rate)]
+
+        p = 0
+        if padding_type == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+        elif padding_type == 'replicate':
+            conv_block += [nn.ReplicationPad2d(1)]
+        elif padding_type == 'zero':
+            p = 1
+        else:
+            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+
+        conv_block += [
+            SeparableConv2d(in_channels=oc, out_channels=ic,
+                            kernel_size=3, padding=p, stride=1),
+            norm_layer(oc)
+        ]
+
+        return nn.Sequential(*conv_block)
+
+    def forward(self, x):
+        out = x + self.conv_block(x)
+        return out
+
+
+class SubMobileResnetGenerator(BaseNetwork):
     def __init__(self, input_nc, output_nc, config, norm_layer=nn.BatchNorm2d,
                  dropout_rate=0, n_blocks=9, padding_type='reflect'):
         assert n_blocks >= 0
@@ -70,51 +119,3 @@ class SubMobileResnetGenerator(nn.Module):
     def forward(self, input):
         input = input.clamp(-1, 1)
         return self.model(input)
-
-
-class MobileResnetBlock(nn.Module):
-    def __init__(self, ic, oc, padding_type, norm_layer, dropout_rate, use_bias):
-        super(MobileResnetBlock, self).__init__()
-        self.conv_block = self.build_conv_block(ic, oc, padding_type, norm_layer, dropout_rate, use_bias)
-
-    def build_conv_block(self, ic, oc, padding_type, norm_layer, dropout_rate, use_bias):
-        conv_block = []
-        p = 0
-        if padding_type == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
-        elif padding_type == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
-        elif padding_type == 'zero':
-            p = 1
-        else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
-
-        conv_block += [
-            SeparableConv2d(in_channels=ic, out_channels=oc,
-                            kernel_size=3, padding=p, stride=1),
-            norm_layer(oc),
-            nn.ReLU(True)
-        ]
-        conv_block += [nn.Dropout(dropout_rate)]
-
-        p = 0
-        if padding_type == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
-        elif padding_type == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
-        elif padding_type == 'zero':
-            p = 1
-        else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
-
-        conv_block += [
-            SeparableConv2d(in_channels=oc, out_channels=ic,
-                            kernel_size=3, padding=p, stride=1),
-            norm_layer(oc)
-        ]
-
-        return nn.Sequential(*conv_block)
-
-    def forward(self, x):
-        out = x + self.conv_block(x)
-        return out

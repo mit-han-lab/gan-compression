@@ -2,26 +2,58 @@ import functools
 
 from torch import nn
 
-scale_factor = 2
+from models.modules.mobile_modules import SeparableConv2d
+from models.networks import BaseNetwork
 
 
-class SeparableConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, norm_layer=nn.InstanceNorm2d,
-                 use_bias=True, scale_factor=1):
-        super(SeparableConv2d, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels=in_channels, out_channels=in_channels * scale_factor, kernel_size=kernel_size,
-                      stride=stride, padding=padding, groups=in_channels, bias=use_bias),
-            norm_layer(in_channels),
-            nn.Conv2d(in_channels=in_channels * scale_factor, out_channels=out_channels,
-                      kernel_size=1, stride=1, bias=use_bias),
-        )
+class MobileResnetBlock(nn.Module):
+    def __init__(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
+        super(MobileResnetBlock, self).__init__()
+        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, dropout_rate, use_bias)
+
+    def build_conv_block(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
+        conv_block = []
+        p = 0
+        if padding_type == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+        elif padding_type == 'replicate':
+            conv_block += [nn.ReplicationPad2d(1)]
+        elif padding_type == 'zero':
+            p = 1
+        else:
+            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+
+        conv_block += [
+            SeparableConv2d(in_channels=dim, out_channels=dim,
+                            kernel_size=3, padding=p, stride=1),
+            norm_layer(dim), nn.ReLU(True)
+        ]
+        conv_block += [nn.Dropout(dropout_rate)]
+
+        p = 0
+        if padding_type == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+        elif padding_type == 'replicate':
+            conv_block += [nn.ReplicationPad2d(1)]
+        elif padding_type == 'zero':
+            p = 1
+        else:
+            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+
+        conv_block += [
+            SeparableConv2d(in_channels=dim, out_channels=dim,
+                            kernel_size=3, padding=p, stride=1),
+            norm_layer(dim)
+        ]
+
+        return nn.Sequential(*conv_block)
 
     def forward(self, x):
-        return self.conv(x)
+        out = x + self.conv_block(x)
+        return out
 
 
-class MobileResnetGenerator(nn.Module):
+class MobileResnetGenerator(BaseNetwork):
     def __init__(self, input_nc, output_nc, ngf, norm_layer=nn.InstanceNorm2d,
                  dropout_rate=0, n_blocks=9, padding_type='reflect'):
         assert (n_blocks >= 0)
@@ -88,50 +120,3 @@ class MobileResnetGenerator(nn.Module):
         #     input = module(input)
         # return input
         return self.model(input)
-
-
-class MobileResnetBlock(nn.Module):
-    def __init__(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
-        super(MobileResnetBlock, self).__init__()
-        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, dropout_rate, use_bias)
-
-    def build_conv_block(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
-        conv_block = []
-        p = 0
-        if padding_type == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
-        elif padding_type == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
-        elif padding_type == 'zero':
-            p = 1
-        else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
-
-        conv_block += [
-            SeparableConv2d(in_channels=dim, out_channels=dim,
-                            kernel_size=3, padding=p, stride=1),
-            norm_layer(dim), nn.ReLU(True)
-        ]
-        conv_block += [nn.Dropout(dropout_rate)]
-
-        p = 0
-        if padding_type == 'reflect':
-            conv_block += [nn.ReflectionPad2d(1)]
-        elif padding_type == 'replicate':
-            conv_block += [nn.ReplicationPad2d(1)]
-        elif padding_type == 'zero':
-            p = 1
-        else:
-            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
-
-        conv_block += [
-            SeparableConv2d(in_channels=dim, out_channels=dim,
-                            kernel_size=3, padding=p, stride=1),
-            norm_layer(dim)
-        ]
-
-        return nn.Sequential(*conv_block)
-
-    def forward(self, x):
-        out = x + self.conv_block(x)
-        return out

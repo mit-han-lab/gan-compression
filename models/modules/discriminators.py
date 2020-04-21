@@ -1,9 +1,14 @@
+import argparse
 import functools
 
-import torch.nn as nn
+from torch import nn
+from torch.nn import functional as F
+
+from models.networks import BaseNetwork
+from utils import util
 
 
-class NLayerDiscriminator(nn.Module):
+class NLayerDiscriminator(BaseNetwork):
     """Defines a PatchGAN discriminator"""
 
     def __init__(self, input_nc, ndf=64, n_layers=3, norm_layer=nn.BatchNorm2d):
@@ -52,7 +57,7 @@ class NLayerDiscriminator(nn.Module):
         return self.model(input)
 
 
-class PixelDiscriminator(nn.Module):
+class PixelDiscriminator(BaseNetwork):
     """Defines a 1x1 PatchGAN discriminator (pixelGAN)"""
 
     def __init__(self, input_nc, ndf=64, norm_layer=nn.BatchNorm2d):
@@ -82,3 +87,58 @@ class PixelDiscriminator(nn.Module):
     def forward(self, input):
         """Standard forward."""
         return self.net(input)
+
+
+class MultiscaleDiscriminator(nn.Module):
+    @staticmethod
+    def modify_commandline_options(parser, is_train):
+        assert isinstance(parser, argparse.ArgumentParser)
+        parser.add_argument('--netD_subarch', type=str, default='n_layer',
+                            help='architecture of each discriminator')
+        parser.add_argument('--num_D', type=int, default=2,
+                            help='number of discriminators to be used in multiscale')
+
+        opt, _ = parser.parse_known_args()
+
+        # define properties of each discriminator of the multiscale discriminator
+        subnetD = util.find_class_in_module(opt.netD_subarch + 'discriminator',
+                                            'models.modules.discriminators')
+        subnetD.modify_commandline_options(parser, is_train)
+        parser.set_defaults(n_layers_D=4)
+
+        return parser
+
+    def __init__(self, opt):
+        super().__init__()
+        self.opt = opt
+
+        for i in range(opt.num_D):
+            subnetD = self.create_single_discriminator(opt)
+            self.add_module('discriminator_%d' % i, subnetD)
+
+    def create_single_discriminator(self, opt):
+        subarch = opt.netD_subarch
+        if subarch == 'n_layer':
+            netD = NLayerDiscriminator(opt)
+        else:
+            raise ValueError('unrecognized discriminator subarchitecture %s' % subarch)
+        return netD
+
+    def downsample(self, input):
+        return F.avg_pool2d(input, kernel_size=3,
+                            stride=2, padding=[1, 1],
+                            count_include_pad=False)
+
+    # Returns list of lists of discriminator outputs.
+    # The final result is of size opt.num_D x opt.n_layers_D
+    def forward(self, input):
+        result = []
+        get_intermediate_features = not self.opt.no_ganFeat_loss
+        for name, D in self.named_children():
+            out = D(input)
+            if not get_intermediate_features:
+                out = [out]
+            result.append(out)
+            input = self.downsample(input)
+
+        return result

@@ -1,6 +1,8 @@
 # GAN Compression
 ### [paper](https://arxiv.org/abs/2003.08936) | [demo](https://tinyurl.com/r474uca)
 
+**[NEW!]** The compressed model and test codes of GauGAN are released! Check [here](#gaugan) to use our models.
+
 **[NEW!]** The [tutorial](docs/training_tutorial.md) of compression is released! Check the [overview](docs/overview.md) for better understanding our codebase.
 
 **[NEW!]** The PyTorch implementation of a general conditional GAN Compression framework is released.  
@@ -128,7 +130,40 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   bash scripts/pix2pix/edges2shoes-r/test_compressed.sh
   ```
 
-#### Cityscapes Dataset
+### <span id="gaugan">GauGAN</span>
+
+#### Setup
+
+* Prepare the cityscapes dataset. Check [here](#cityscapes) for preparing the cityscapes dataset.
+
+* Get the statistical information for the ground-truth images for your dataset to compute FID. We provide pre-prepared real statistics for several datasets. For example,
+
+  ```shell
+  bash datasets/download_real_stat.sh cityscapes A
+  ```
+
+#### Apply a Pre-trained Model
+
+* Download the pre-trained models.
+
+  ```shell
+  python scripts/download_model.py --model gaugan --task cityscapes --stage full
+  python scripts/download_model.py --model gaugan --task cityscapes --stage compressed
+  ```
+
+* Test the original full model.
+
+  ```shell
+  bash scripts/gaugan/gaugan/test_full.sh
+  ```
+
+* Test the compressed model.
+
+  ```shell
+  bash scripts/gaugan/gaugan/test_compressed.sh
+  ```
+
+### <span id="cityscapes">Cityscapes Dataset</span>
 
 For the Cityscapes dataset, we cannot provide it due to license issue. Please download the dataset from https://cityscapes-dataset.com and use the script `datasets/prepare_cityscapes_dataset.py` to preprocess it. You need to download `gtFine_trainvaltest.zip` and `leftImg8bit_trainvaltest.zip` and unzip them in the same folder. For example, you may put `gtFine` and `leftImg8bit` in `database/cityscapes-origin`. You need to prepare the dataset with the following commands:
 
@@ -143,13 +178,7 @@ python datasets/prepare_cityscapes_dataset.py \
 
 You will get a preprocessed dataset in `database/cityscapes` and a mapping table (used to compute mAP) in `dataset/table.txt`.
 
-To support mAP computation, you need to download a pre-trained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. Then you can test our compressed models on cityscapes by running
-
-```bash
-bash scripts/pix2pix/cityscapes/test_compressed.sh
-```
-
-after you have downloaded our compressed models.
+To support mAP computation, you need to download a pre-trained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. Then you can test our compressed models on cityscapes after you have downloaded our compressed models.
 
 ## [Training](docs/training_tutorial.md)
 
