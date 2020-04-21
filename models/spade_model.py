@@ -14,7 +14,7 @@ class SPADEModel(BaseModel):
         assert isinstance(parser, argparse.ArgumentParser)
         parser.add_argument('--z_dim', type=int, default=256,
                             help="dimension of the latent z vector")
-        parser.set_defaults(netG='spade')
+        parser.set_defaults(netG='sub_mobile_spade')
         parser = networks.modify_commandline_options(parser, is_train)
         return parser
 

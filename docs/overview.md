@@ -34,10 +34,11 @@ To help users better understand and use our codebase, we briefly overview the fu
 
 * [\_\_init\_\_.py](../models/__init__.py)  implements the interface between this package and training and test scripts.  `train.py` and `test.py` call `from models import create_model` and `model = create_model(opt)` to create a model given the option `opt`. You also need to call `model.setup(opt)` to properly initialize the model.
 * [base_model.py](../models/base_model.py) implements an abstract base class ([ABC](https://docs.python.org/3/library/abc.html)) for models. It also includes commonly used helper functions (e.g., `setup`, `test`, `update_learning_rate`, `save_networks`, `load_networks`), which can be later used in subclasses.
-* [pix2pix_model.py](../models/pix2pix_model.py) implements the pix2pix [model](https://phillipi.github.io/pix2pix/), for learning a mapping from input images to output images given paired data. The model training requires `--dataset_mode aligned` dataset. By default, it uses a `--netG resnet_9block` ResNet generator, a `--netD n_layer --n_layers_D 3` discriminator (PatchGAN), and  a `--gan_mode hinge` GAN loss (standard cross-entropy objective).
-* [cycle_gan_model.py](../models/cycle_gan_model.py) implements the CycleGAN [model](https://junyanz.github.io/CycleGAN/), for learning image-to-image translation  without paired data.  The model training requires `--dataset_mode unaligned` dataset. By default, it uses a `--netG resnet_9blocks` ResNet generator, a `--netD n_layer --n_layers_D 3` discriminator (PatchGAN  introduced by pix2pix), and a least-square GANs [objective](https://arxiv.org/abs/1611.04076) (`--gan_mode lsgan`).
+* [pix2pix_model.py](../models/pix2pix_model.py) implements the pix2pix [model](https://phillipi.github.io/pix2pix/), for learning a mapping from input images to output images given paired data. The model training requires `--dataset_mode aligned` dataset. By default, it uses a ResNet generator, a `--netD n_layer --n_layers_D 3` discriminator (PatchGAN), and  a `--gan_mode hinge` GAN loss (standard cross-entropy objective).
+* [cycle_gan_model.py](../models/cycle_gan_model.py) implements the CycleGAN [model](https://junyanz.github.io/CycleGAN/), for learning image-to-image translation  without paired data.  The model training requires `--dataset_mode unaligned` dataset. By default, it uses a ResNet generator, a `--netD n_layer --n_layers_D 3` discriminator (PatchGAN  introduced by pix2pix), and a least-square GANs [objective](https://arxiv.org/abs/1611.04076) (`--gan_mode lsgan`).
+* [spade_model.py](../models/spade_model.py) implements training and testing (currently only testing) GauGAN [model](https://nvlabs.github.io/SPADE/), a state-of-the-art paired image-to-image translation model. By default, it uses a SPADE generator.
 * [networks.py](../models/networks.py) module implements normalization layers, initialization methods, and optimization scheduler (i.e., learning rate policy).
-* [test_model.py](../models/test_model.py) implements a model that can be used to generate results for one direction.
+* [test_model.py](../models/test_model.py) implements a model that can be used to generate results in one direction for CycleGAN and pix2pix modesl.
 * [modules](../models/modules) directory contains many pytorch nn.Module networks and loss moduels.
 
 ### [distillers](../distillers)
@@ -60,7 +61,7 @@ To help users better understand and use our codebase, we briefly overview the fu
 [configs](../configs) directory contains modules related to the configuration set used in "once-for-all" network training.
 
 * [\_\_init\_\_.py](../configs/__init__.py) contains an encoding and a decoding function of the configuration description string.
-* [resnet_configs.py](../configs/resnet_configs.py) is a module that implements a configuration set class that used in training Resnet-based "once-for-all" network.
+* [resnet_configs.py](../configs/resnet_configs.py) is a module that implements a configuration set class that used in training Resnet-based "once-for-all" network. 
 * [single_configs.py](../configs/single_configs.py) is a module that implements a configuration set class that only contains a single configuration. Usually, it is used in fine-tuning.
 
 
