@@ -154,13 +154,13 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 * Test the original full model.
 
   ```shell
-  bash scripts/gaugan/gaugan/test_full.sh
+  bash scripts/gaugan/cityscapes/test_full.sh
   ```
 
 * Test the compressed model.
 
   ```shell
-  bash scripts/gaugan/gaugan/test_compressed.sh
+  bash scripts/gaugan/cityscapes/test_compressed.sh
   ```
 
 ### <span id="cityscapes">Cityscapes Dataset</span>
