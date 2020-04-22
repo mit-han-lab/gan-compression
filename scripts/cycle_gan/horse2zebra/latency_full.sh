@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-python test.py --dataroot database/horse2zebra/valA \
+python latency.py --dataroot database/horse2zebra/valA \
   --dataset_mode single \
   --results_dir results-pretrained/cycle_gan/horse2zebra/full \
   --ngf 64 --netG resnet_9blocks \

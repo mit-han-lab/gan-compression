@@ -71,7 +71,7 @@ class MobileSPADE(nn.Module):
         super(MobileSPADE, self).__init__()
 
         assert config_text.startswith('spade')
-        parsed = re.search('spade(\D+)(\d)x\d', config_text)
+        parsed = re.search(r'spade(\D+)(\d)x\d', config_text)
         param_free_norm_type = str(parsed.group(1))
         ks = int(parsed.group(2))
 
@@ -117,7 +117,7 @@ class SPADE(nn.Module):
         super(SPADE, self).__init__()
 
         assert config_text.startswith('spade')
-        parsed = re.search('spade(\D+)(\d)x\d', config_text)
+        parsed = re.search(r'spade(\D+)(\d)x\d', config_text)
         param_free_norm_type = str(parsed.group(1))
         ks = int(parsed.group(2))
 
@@ -163,7 +163,7 @@ class SuperMobileSPADE(nn.Module):
         super(SuperMobileSPADE, self).__init__()
 
         assert config_text.startswith('spade')
-        parsed = re.search('spade(\D+)(\d)x\d', config_text)
+        parsed = re.search(r'spade(\D+)(\d)x\d', config_text)
         param_free_norm_type = str(parsed.group(1))
         ks = int(parsed.group(2))
 
@@ -211,7 +211,7 @@ class SubMobileSPADE(nn.Module):
         super(SubMobileSPADE, self).__init__()
 
         assert config_text.startswith('spade')
-        parsed = re.search('spade(\D+)(\d)x\d', config_text)
+        parsed = re.search(r'spade(\D+)(\d)x\d', config_text)
         param_free_norm_type = str(parsed.group(1))
         ks = int(parsed.group(2))
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-python test.py --dataroot database/maps \
+python latency.py --dataroot database/maps \
   --results_dir results-pretrained/pix2pix/map2sat/full \
   --ngf 64 --netG resnet_9blocks \
   --restore_G_path pretrained/pix2pix/map2sat/full/latest_net_G.pth \

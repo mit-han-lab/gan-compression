@@ -66,9 +66,7 @@ def main(opt):
         from models.modules.spade_architecture.sub_mobile_spade_generator import SubMobileSPADEGenerator as SubModel
         opt.norm_G = 'spadesyncbatch3x3'
         opt.num_upsampling_layers = 'more'
-        opt.semantic_nc = opt.input_nc + \
-                          (1 if opt.contain_dontcare_label else 0) + \
-                          (0 if opt.no_instance else 1)
+        opt.semantic_nc = opt.input_nc + (1 if opt.contain_dontcare_label else 0) + (0 if opt.no_instance else 1)
         super_model = SuperModel(opt)
         sub_model = SubModel(opt, config)
     else:

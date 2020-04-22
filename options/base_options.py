@@ -132,9 +132,7 @@ class BaseOptions:
         opt.isTrain = self.isTrain  # train or test
 
         if hasattr(opt, 'contain_dontcare_label') and hasattr(opt, 'no_instance'):
-            opt.semantic_nc = opt.input_nc + \
-                              (1 if opt.contain_dontcare_label else 0) + \
-                              (0 if opt.no_instance else 1)
+            opt.semantic_nc = opt.input_nc + (1 if opt.contain_dontcare_label else 0) + (0 if opt.no_instance else 1)
 
         if verbose:
             self.print_options(opt)

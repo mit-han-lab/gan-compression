@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 from torch.nn import functional as F
 
@@ -120,19 +119,10 @@ class SuperMobileSPADEGenerator(BaseNetwork):
         if acts is None:
             acts = []
         ret_acts = {}
-
-        if self.opt.use_vae:
-            # we sample z from unit normal and reshape the tensor
-            if z is None:
-                z = torch.randn(input.size(0), self.opt.z_dim,
-                                dtype=torch.float32, device=input.get_device())
-            x = self.fc(z)
-            x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
-        else:
-            # we downsample segmap and run convolution
-            x = F.interpolate(seg, size=(self.sh, self.sw))
-            channel = self.config['channels'][0]
-            x = self.fc(x, {'channel': channel * 16})
+        # we downsample segmap and run convolution
+        x = F.interpolate(seg, size=(self.sh, self.sw))
+        channel = self.config['channels'][0]
+        x = self.fc(x, {'channel': channel * 16})
         if 'fc' in acts:
             ret_acts['fc'] = x
 
@@ -184,10 +174,6 @@ class SuperMobileSPADEGenerator(BaseNetwork):
             ret_acts['up_3'] = x
         if self.opt.num_upsampling_layers == 'most':
             raise NotImplementedError
-            x = self.up(x)
-            x = self.up_4(x, seg)
-            if 'up_4' in acts:
-                ret_acts['up_4'] = x
         x = self.conv_img(F.leaky_relu(x, 2e-1), {'channel': self.conv_img.out_channels})
         x = F.tanh(x)
 

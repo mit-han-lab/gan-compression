@@ -47,7 +47,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 - Install [PyTorch](https://pytorch.org) 1.4 and other dependencies (e.g., torchvision).
 
   - For pip users, please type the command `pip install -r requirements.txt`.
-  - For Conda users, we provide an installation script `./scripts/conda_deps.sh`. Alternatively, you can create a new Conda environment using `conda env create -f environment.yml`.
+  - For Conda users, we provide an installation script `scripts/conda_deps.sh`. Alternatively, you can create a new Conda environment using `conda env create -f environment.yml`.
 
 - Install [torchprofile](https://github.com/mit-han-lab/torchprofile).
 
@@ -92,6 +92,12 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   ```shell
   bash scripts/cycle_gan/horse2zebra/test_compressed.sh
   ```
+* Measure the latency of the two models.
+
+  ```shell
+  bash scripts/cycle_gan/horse2zebra/latency_full.sh
+  bash scripts/cycle_gan/horse2zebra/latency_compressed.sh
+  ```
 
 ### Pix2pix
 
@@ -129,6 +135,14 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   ```shell
   bash scripts/pix2pix/edges2shoes-r/test_compressed.sh
   ```
+  
+* Measure the latency of the two models.
+
+  ```shell
+  bash scripts/pix2pix/edges2shoes-r/latency_full.sh
+  bash scripts/pix2pix/edges2shoes-r/latency_compressed.sh
+  ```
+
 
 ### <span id="gaugan">GauGAN</span>
 
@@ -161,6 +175,12 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 
   ```shell
   bash scripts/gaugan/cityscapes/test_compressed.sh
+  ```
+* Measure the latency of the two models.
+
+  ```shell
+  bash scripts/gaugan/cityscapes/latency_full.sh
+  bash scripts/gaugan/cityscapes/latency_compressed.sh
   ```
 
 ### <span id="cityscapes">Cityscapes Dataset</span>
@@ -195,7 +215,7 @@ python get_real_stat.py \
 --direction AtoB
   ```
 
-## [Code Structure](./docs/overview.md)
+## [Code Structure](docs/overview.md)
 
 To help users better understand and use our code, we briefly overview the functionality and implementation of each package and each module.
 

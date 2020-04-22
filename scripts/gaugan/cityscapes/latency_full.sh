@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-python test.py --dataroot database/cityscapes-origin \
+python latency.py --dataroot database/cityscapes-origin \
   --model spade --dataset_mode cityscapes \
   --results_dir results-pretrained/gaugan/cityscapes/full \
   --ngf 64 --netG spade \

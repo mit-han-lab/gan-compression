@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-python test.py --dataroot database/edges2shoes-r \
+python latency.py --dataroot database/edges2shoes-r \
   --results_dir results-pretrained/pix2pix/edges2shoes-r/full \
   --ngf 64 --netG resnet_9blocks \
   --restore_G_path pretrained/pix2pix/edges2shoes-r/full/latest_net_G.pth \

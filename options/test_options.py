@@ -32,6 +32,8 @@ class TestOptions(BaseOptions):
         parser.add_argument('--real_stat_path', type=str, required=None,
                             help='the path to load the groud-truth images information to compute FID.')
         parser.add_argument('--no_mAP', action='store_true')
+        parser.add_argument('--times', type=int, default=100,
+                            help='times of forwarding the data to test the latency')
         parser.set_defaults(phase='val', serial_batches=True, no_flip=True,
                             load_size=parser.get_default('crop_size'), batch_size=1)
         return parser

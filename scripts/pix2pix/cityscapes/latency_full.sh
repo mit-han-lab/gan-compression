@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-python test.py --dataroot database/cityscapes \
+python latency.py --dataroot database/cityscapes \
   --results_dir results-pretrained/pix2pix/cityscapes/full \
   --ngf 64 --netG resnet_9blocks \
   --restore_G_path pretrained/pix2pix/cityscapes/full/latest_net_G.pth \
