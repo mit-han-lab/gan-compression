@@ -83,7 +83,7 @@ if __name__ == '__main__':
         for i, data_i in enumerate(dataloader):
             model.set_input(data_i)
             if i == 0:
-                macs = model.profile(config)
+                macs, _ = model.profile(config)
             model.test(config)
             fakes.append(model.fake_B.cpu())
             for path in model.get_image_paths():

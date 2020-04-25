@@ -9,10 +9,6 @@ import warnings
 import numpy as np
 import torch
 import tqdm
-from torch import multiprocessing as mp
-from torch import nn
-from torch.backends import cudnn
-
 from configs import encode_config
 from data import create_dataloader
 from metric import get_fid, get_mAP
@@ -20,6 +16,9 @@ from metric.inception import InceptionV3
 from metric.mAP_score import DRNSeg
 from models import create_model
 from options.search_options import SearchOptions
+from torch import multiprocessing as mp
+from torch import nn
+from torch.backends import cudnn
 from utils import util
 
 
@@ -70,7 +69,7 @@ def main(configs, opt, gpu_id, queue, verbose):
         for i, data_i in enumerate(dataloader):
             model.set_input(data_i)
             if i == 0:
-                macs = model.profile(config)
+                macs, _ = model.profile(config)
             model.test(config)
             fakes.append(model.fake_B.cpu())
             for path in model.get_image_paths():
