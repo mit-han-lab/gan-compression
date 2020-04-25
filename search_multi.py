@@ -9,6 +9,10 @@ import warnings
 import numpy as np
 import torch
 import tqdm
+from torch import multiprocessing as mp
+from torch import nn
+from torch.backends import cudnn
+
 from configs import encode_config
 from data import create_dataloader
 from metric import get_fid, get_mAP
@@ -16,9 +20,6 @@ from metric.inception import InceptionV3
 from metric.mAP_score import DRNSeg
 from models import create_model
 from options.search_options import SearchOptions
-from torch import multiprocessing as mp
-from torch import nn
-from torch.backends import cudnn
 from utils import util
 
 
