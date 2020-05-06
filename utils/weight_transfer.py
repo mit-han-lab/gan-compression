@@ -19,7 +19,7 @@ def transfer_Conv2d(m1, m2, input_index=None, output_index=None):
             input_index = [0, 1, 2]
         p = m1.weight.data
 
-        if input_index is not None:
+        if input_index is None:
             q = p.abs().sum([0, 2, 3])
             _, idxs = q.topk(m2.in_channels, largest=True)
             p = p[:, idxs]
