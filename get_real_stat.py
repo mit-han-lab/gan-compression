@@ -43,8 +43,7 @@ if __name__ == '__main__':
     parser.add_argument('--direction', type=str, default='AtoB', help='AtoB or BtoA')
     parser.add_argument('--load_size', type=int, default=256, help='scale images to this size')
     parser.add_argument('--crop_size', type=int, default=256, help='then crop to this size')
-    parser.add_argument('--preprocess', type=str, default='resize_and_crop',
-                        help='scaling and cropping of images at load time '
+    parser.add_argument('--preprocess', type=str, default='none', help='scaling and cropping of images at load time '
                              '[resize_and_crop | crop | scale_width | scale_width_and_crop | none]')
     parser.add_argument('--phase', type=str, default='val', help='train, val, test, etc')
     parser.add_argument('--output_path', type=str, required=True,

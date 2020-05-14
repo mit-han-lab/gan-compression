@@ -135,7 +135,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   ```shell
   bash scripts/pix2pix/edges2shoes-r/test_compressed.sh
   ```
-  
+
 * Measure the latency of the two models.
 
   ```shell
@@ -214,6 +214,8 @@ python get_real_stat.py \
 --output_path real_stat/edges2shoes-r_B.npz \
 --direction AtoB
   ```
+
+For paired image-to-image translation (pix2pix and GauGAN), we calculate the FID between generated test images to real test images. For unpaired image-to-image translation (CycleGAN), we calculate the FID between generated test images to real training+test images. This allows us to use more images for a stable FID evaluation, as done in previous unconditional GANs research. The difference of the two protocols is small. The FID of our compressed CycleGAN model increases by 4 when using real test images instead of real training+test images. 
 
 ## [Code Structure](docs/overview.md)
 
