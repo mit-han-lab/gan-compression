@@ -77,8 +77,8 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 * Download the pre-trained models.
 
   ```shell
-  python scripts/download_model.py --model pix2pix --task edges2shoes-r --stage full
-  python scripts/download_model.py --model pix2pix --task edges2shoes-r --stage compressed
+  python scripts/download_model.py --model cyclegan --task horse2zebra --stage full
+  python scripts/download_model.py --model cyclegan --task horse2zebra --stage compressed
   ```
 
 * Test the original full model.
