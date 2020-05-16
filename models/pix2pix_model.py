@@ -174,12 +174,18 @@ class Pix2PixModel(BaseModel):
                 name = os.path.splitext(short_path)[0]
                 names.append(name)
                 if cnt < 10:
-                    input_im = util.tensor2im(self.real_A[j])
-                    real_im = util.tensor2im(self.real_B[j])
-                    fake_im = util.tensor2im(self.fake_B[j])
-                    util.save_image(input_im, os.path.join(save_dir, 'input', '%s.png' % name), create_dir=True)
-                    util.save_image(real_im, os.path.join(save_dir, 'real', '%s.png' % name), create_dir=True)
-                    util.save_image(fake_im, os.path.join(save_dir, 'fake', '%s.png' % name), create_dir=True)
+                    if self.opt.input_nc == 6:
+                        A, D = torch.split(self.real_A[j], 3, dim=0)
+                        sample = [A, D, self.real_B[j], self.fake_B[j]]
+                        sample_im = util.tensor2im(torch.cat(sample, dim=2))
+                        util.save_image(sample_im, os.path.join(save_dir, 'sample', '%s.png' % name), create_dir=True)
+                    else:
+                        input_im = util.tensor2im(self.real_A[j])
+                        real_im = util.tensor2im(self.real_B[j])
+                        fake_im = util.tensor2im(self.fake_B[j])
+                        util.save_image(input_im, os.path.join(save_dir, 'input', '%s.png' % name), create_dir=True)
+                        util.save_image(real_im, os.path.join(save_dir, 'real', '%s.png' % name), create_dir=True)
+                        util.save_image(fake_im, os.path.join(save_dir, 'fake', '%s.png' % name), create_dir=True)
                 cnt += 1
 
         fid = get_fid(fakes, self.inception_model, self.npz,
