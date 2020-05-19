@@ -64,7 +64,7 @@ class MobileResnetGenerator(BaseNetwork):
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
-
+        
         self.conv_layer = CoordConv if use_coord else nn.Conv2d
         self.conv_t_layer = CoordConvTranspose if use_coord else nn.ConvTranspose2d
 
