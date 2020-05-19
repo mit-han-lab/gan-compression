@@ -2,13 +2,15 @@ import functools
 
 from torch import nn
 
-from models.modules.mobile_modules import SeparableConv2d
+from models.modules.mobile_modules import SeparableConv2d, SeparableCoordConv2d
+from models.modules.coord_conv import CoordConv, CoordConvTranspose
 from models.networks import BaseNetwork
 
 
 class MobileResnetBlock(nn.Module):
-    def __init__(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
+    def __init__(self, dim, padding_type, norm_layer, dropout_rate, use_bias, use_coord):
         super(MobileResnetBlock, self).__init__()
+        self.conv_layer = SeparableCoordConv2d if use_coord else SeparableConv2d
         self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, dropout_rate, use_bias)
 
     def build_conv_block(self, dim, padding_type, norm_layer, dropout_rate, use_bias):
@@ -24,7 +26,7 @@ class MobileResnetBlock(nn.Module):
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
 
         conv_block += [
-            SeparableConv2d(in_channels=dim, out_channels=dim,
+            self.conv_layer(in_channels=dim, out_channels=dim,
                             kernel_size=3, padding=p, stride=1),
             norm_layer(dim), nn.ReLU(True)
         ]
@@ -41,7 +43,7 @@ class MobileResnetBlock(nn.Module):
             raise NotImplementedError('padding [%s] is not implemented' % padding_type)
 
         conv_block += [
-            SeparableConv2d(in_channels=dim, out_channels=dim,
+            self.conv_layer(in_channels=dim, out_channels=dim,
                             kernel_size=3, padding=p, stride=1),
             norm_layer(dim)
         ]
@@ -55,23 +57,26 @@ class MobileResnetBlock(nn.Module):
 
 class MobileResnetGenerator(BaseNetwork):
     def __init__(self, input_nc, output_nc, ngf, norm_layer=nn.InstanceNorm2d,
-                 dropout_rate=0, n_blocks=9, padding_type='reflect'):
+                 dropout_rate=0, n_blocks=9, padding_type='reflect', use_coord=False):
         assert (n_blocks >= 0)
         super(MobileResnetGenerator, self).__init__()
         if type(norm_layer) == functools.partial:
             use_bias = norm_layer.func == nn.InstanceNorm2d
         else:
             use_bias = norm_layer == nn.InstanceNorm2d
+        
+        self.conv_layer = CoordConv if use_coord else nn.Conv2d
+        self.conv_t_layer = CoordConvTranspose if use_coord else nn.ConvTranspose2d
 
         model = [nn.ReflectionPad2d(3),
-                 nn.Conv2d(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
+                 self.conv_layer(input_nc, ngf, kernel_size=7, padding=0, bias=use_bias),
                  norm_layer(ngf),
                  nn.ReLU(True)]
 
         n_downsampling = 2
         for i in range(n_downsampling):  # add downsampling layers
             mult = 2 ** i
-            model += [nn.Conv2d(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
+            model += [self.conv_layer(ngf * mult, ngf * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
                       norm_layer(ngf * mult * 2),
                       nn.ReLU(True)]
 
@@ -84,28 +89,31 @@ class MobileResnetGenerator(BaseNetwork):
         for i in range(n_blocks1):
             model += [MobileResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer,
                                         dropout_rate=dropout_rate,
-                                        use_bias=use_bias)]
+                                        use_bias=use_bias,
+                                        use_coord=use_coord)]
 
         for i in range(n_blocks2):
             model += [MobileResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer,
                                         dropout_rate=dropout_rate,
-                                        use_bias=use_bias)]
+                                        use_bias=use_bias,
+                                        use_coord=use_coord)]
 
         for i in range(n_blocks3):
             model += [MobileResnetBlock(ngf * mult, padding_type=padding_type, norm_layer=norm_layer,
                                         dropout_rate=dropout_rate,
-                                        use_bias=use_bias)]
+                                        use_bias=use_bias,
+                                        use_coord=use_coord)]
 
         for i in range(n_downsampling):  # add upsampling layers
             mult = 2 ** (n_downsampling - i)
-            model += [nn.ConvTranspose2d(ngf * mult, int(ngf * mult / 2),
+            model += [self.conv_t_layer(ngf * mult, int(ngf * mult / 2),
                                          kernel_size=3, stride=2,
                                          padding=1, output_padding=1,
                                          bias=use_bias),
                       norm_layer(int(ngf * mult / 2)),
                       nn.ReLU(True)]
         model += [nn.ReflectionPad2d(3)]
-        model += [nn.Conv2d(ngf, output_nc, kernel_size=7, padding=0)]
+        model += [self.conv_layer(ngf, output_nc, kernel_size=7, padding=0)]
         model += [nn.Tanh()]
         self.model = nn.Sequential(*model)
 
