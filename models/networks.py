@@ -139,7 +139,7 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', dropout_rate=0,
     if netG == 'resnet_9blocks':
         from .modules.resnet_architecture.resnet_generator import ResnetGenerator
         net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer,
-                              dropout_rate=dropout_rate, n_blocks=9)
+                              dropout_rate=dropout_rate, n_blocks=9, use_coord=opt.use_coord)
     elif netG == 'mobile_resnet_9blocks':
         from .modules.resnet_architecture.mobile_resnet_generator import MobileResnetGenerator
         net = MobileResnetGenerator(input_nc, output_nc, ngf=ngf, norm_layer=norm_layer,

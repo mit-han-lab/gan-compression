@@ -1,5 +1,5 @@
 from torch import nn
-
+from models.modules.coord_conv import CoordConv
 
 class SeparableConv2d(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, norm_layer=nn.InstanceNorm2d,
@@ -7,6 +7,22 @@ class SeparableConv2d(nn.Module):
         super(SeparableConv2d, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=in_channels * scale_factor, kernel_size=kernel_size,
+                      stride=stride, padding=padding, groups=in_channels, bias=use_bias),
+            norm_layer(in_channels),
+            nn.Conv2d(in_channels=in_channels * scale_factor, out_channels=out_channels,
+                      kernel_size=1, stride=1, bias=use_bias),
+        )
+
+    def forward(self, x):
+        return self.conv(x)
+
+
+class SeparableCoordConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, norm_layer=nn.InstanceNorm2d,
+                 use_bias=True, scale_factor=1):
+        super(SeparableConv2d, self).__init__()
+        self.conv = nn.Sequential(
+            CoordConv(in_channels=in_channels, out_channels=in_channels * scale_factor, kernel_size=kernel_size,
                       stride=stride, padding=padding, groups=in_channels, bias=use_bias),
             norm_layer(in_channels),
             nn.Conv2d(in_channels=in_channels * scale_factor, out_channels=out_channels,
