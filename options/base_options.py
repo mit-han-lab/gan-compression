@@ -38,8 +38,11 @@ class BaseOptions:
                             help='network initialization [normal | xavier | kaiming | orthogonal]')
         parser.add_argument('--init_gain', type=float, default=0.02,
                             help='scaling factor for normal, xavier and orthogonal.')
-        parser.add_argument('--use_coord', dest='use_coord', action='store_true')
-        parser.set_defaults(use_coord=False)
+        parser.add_argument('--use_coord', dest='use_coord', action='store_true',
+                            help='add CoordConv Layers instead Convolution layer or not')
+        parser.add_argument('--use_spatial', dest='use_spatial', action='store_true',
+                            help='add Spatial Transformer Layer into net')
+        parser.set_defaults(use_coord=False, use_spatial=False)
 
         # dataset parameters
         parser.add_argument('--dataset_mode', type=str, default='aligned',
