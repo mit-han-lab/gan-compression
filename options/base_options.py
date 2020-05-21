@@ -40,9 +40,9 @@ class BaseOptions:
                             help='scaling factor for normal, xavier and orthogonal.')
         parser.add_argument('--use_coord', dest='use_coord', action='store_true',
                             help='add CoordConv Layers instead Convolution layer or not')
-        parser.add_argument('--use_spatial', dest='use_spatial', action='store_true',
-                            help='add Spatial Transformer Layer into net')
-        parser.set_defaults(use_coord=False, use_spatial=False)
+        parser.add_argument('--use_motion', dest='use_motion', action='store_true',
+                            help='add Dense Motion Layer into net')
+        parser.set_defaults(use_coord=False, use_motion=False)
 
         # dataset parameters
         parser.add_argument('--dataset_mode', type=str, default='aligned',

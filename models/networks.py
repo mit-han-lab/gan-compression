@@ -112,9 +112,10 @@ def init_weights(net, init_type='normal', init_gain=0.02):
             if hasattr(m, 'bias') and m.weight is not None:
                 init.constant_(m.bias.data, 0.0)
         elif classname.find(
-                'SpatialTransform') != -1: # SpatialTransform Layer shoudl initilizate with identity transformation
-            init.zeros_(m.localization[-1].weight.data)
-            m.localization[-1].bias.data.copy_(torch.tensor([1, 0, 0, 0, 1, 0], dtype=torch.float))
+                'DenseMotion') != -1: # SpatialTransform Layer shoudl initilizate with identity transformation
+            m1, m2 = m.grid_map[0], m.grid_map[3]
+            init.normal_(m1.weight.data, 0.0, init_gain * 0.01)
+            init.normal_(m2.weight.data, 0.0, init_gain * 0.01)
             
 
     print('initialize network with %s' % init_type)
@@ -149,7 +150,7 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', dropout_rate=0,
         from .modules.resnet_architecture.mobile_resnet_generator import MobileResnetGenerator
         net = MobileResnetGenerator(input_nc, output_nc, ngf=ngf, norm_layer=norm_layer,
                                     dropout_rate=dropout_rate, n_blocks=9,
-                                    use_coord=opt.use_coord, use_spatial=opt.use_spatial)
+                                    use_coord=opt.use_coord, use_motion=opt.use_motion)
     elif netG == 'super_mobile_resnet_9blocks':
         from .modules.resnet_architecture.super_mobile_resnet_generator import SuperMobileResnetGenerator
         net = SuperMobileResnetGenerator(input_nc, output_nc, ngf=ngf, norm_layer=norm_layer,

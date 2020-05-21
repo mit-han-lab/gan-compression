@@ -4,7 +4,7 @@ from torch import nn
 
 from models.modules.mobile_modules import SeparableConv2d, SeparableCoordConv2d
 from models.modules.coord_conv import CoordConv, CoordConvTranspose
-from models.modules.spatial_transform import SpatialTransform
+from models.modules.dense_motion import DenseMotion, DenseMotionWithIdentity
 from models.networks import BaseNetwork
 
 
@@ -59,7 +59,7 @@ class MobileResnetBlock(nn.Module):
 class MobileResnetGenerator(BaseNetwork):
     def __init__(self, input_nc, output_nc, ngf, norm_layer=nn.InstanceNorm2d,
                  dropout_rate=0, n_blocks=9, padding_type='reflect',
-                 use_coord=False, use_spatial=False):
+                 use_coord=False, use_motion=False):
         assert (n_blocks >= 0)
         super(MobileResnetGenerator, self).__init__()
         if type(norm_layer) == functools.partial:
@@ -84,9 +84,8 @@ class MobileResnetGenerator(BaseNetwork):
 
         mult = 2 ** n_downsampling
 
-        if use_spatial:
-            # model += [nn.Conv2d(ngf * mult, 4, kernel_size=3, padding=1, bias=use_bias)]
-            model += [SpatialTransform(in_features = ngf * mult * 64 * 64)]
+        if use_motion:
+            model += [DenseMotionWithIdentity(ngf * mult, ngf, norm_layer=norm_layer, use_bias=use_bias)]
         
         n_blocks1 = n_blocks // 3
         n_blocks2 = n_blocks1
@@ -125,12 +124,12 @@ class MobileResnetGenerator(BaseNetwork):
 
     def forward(self, input):
         """Standard forward"""
-        input = input.clamp(-1, 1)
-        for i, module in enumerate(self.model):
-            print(i, input.size())
-            print(module)
-            if isinstance(module, nn.Conv2d):
-                print(module.stride)
-            input = module(input)
-        return input
-        # return self.model(input)
+        # input = input.clamp(-1, 1)
+        # for i, module in enumerate(self.model):
+        #     print(i, input.size())
+        #     print(module)
+        #     if isinstance(module, nn.Conv2d):
+        #         print(module.stride)
+        #     input = module(input)
+        # return input
+        return self.model(input)
