@@ -27,7 +27,7 @@ class MobileResnetBlock(nn.Module):
 
         conv_block += [
             self.conv_layer(in_channels=dim, out_channels=dim,
-                            kernel_size=3, padding=p, stride=1),
+                            kernel_size=3, padding=p, stride=1, use_bias=use_bias),
             norm_layer(dim), nn.ReLU(True)
         ]
         conv_block += [nn.Dropout(dropout_rate)]
@@ -44,7 +44,7 @@ class MobileResnetBlock(nn.Module):
 
         conv_block += [
             self.conv_layer(in_channels=dim, out_channels=dim,
-                            kernel_size=3, padding=p, stride=1),
+                            kernel_size=3, padding=p, stride=1, use_bias=use_bias),
             norm_layer(dim)
         ]
 
