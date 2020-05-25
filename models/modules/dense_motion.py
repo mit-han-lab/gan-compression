@@ -37,7 +37,9 @@ class DenseMotionWithIdentity(DenseMotion):
             x == F.grid_sample(x, grid)
             >>> True
         '''
-        theta = torch.Tensor([1, 0, 0, 0, 1, 0])
+        bs = x.size(0)
+        theta = torch.Tensor([1, 0, 0, 0, 1, 0]).to(x.device)
+        theta = theta.repeat(bs).reshape(bs, -1)
         theta = theta.view(-1, 2, 3)
         grid = F.affine_grid(theta, x.size(), align_corners=True)
         grid.requires_grad_(False)
