@@ -59,7 +59,7 @@ class MobileResnetBlock(nn.Module):
 class MobileResnetGenerator(BaseNetwork):
     def __init__(self, input_nc, output_nc, ngf, norm_layer=nn.InstanceNorm2d,
                  dropout_rate=0, n_blocks=9, padding_type='reflect',
-                 use_coord=False, use_motion=False):
+                 use_coord=False, use_motion=False, use_m_tanh=False):
         assert (n_blocks >= 0)
         super(MobileResnetGenerator, self).__init__()
         if type(norm_layer) == functools.partial:
@@ -85,7 +85,7 @@ class MobileResnetGenerator(BaseNetwork):
         mult = 2 ** n_downsampling
 
         if use_motion:
-            model += [DenseMotionWithIdentity(ngf * mult, ngf, norm_layer=norm_layer, use_bias=use_bias)]
+            model += [DenseMotionWithIdentity(ngf * mult, ngf, norm_layer=norm_layer, use_bias=use_bias, use_tanh=use_m_tanh)]
         
         n_blocks1 = n_blocks // 3
         n_blocks2 = n_blocks1
