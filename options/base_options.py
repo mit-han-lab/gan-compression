@@ -42,7 +42,9 @@ class BaseOptions:
                             help='add CoordConv Layers instead Convolution layer or not')
         parser.add_argument('--use_motion', dest='use_motion', action='store_true',
                             help='add Dense Motion Layer into net')
-        parser.set_defaults(use_coord=False, use_motion=False)
+        parser.add_argument('--use_wandb', dest='use_wandb', action='store_true',
+                            help='use weights&biases as a visualization tool')
+        parser.set_defaults(use_coord=False, use_motion=False, use_wandb=False)
 
         # dataset parameters
         parser.add_argument('--dataset_mode', type=str, default='aligned',

@@ -15,6 +15,8 @@ from models import networks
 from models.base_model import BaseModel
 from utils import util
 
+from models.modules.dense_motion import get_only_grids
+
 
 class Pix2PixModel(BaseModel):
 
@@ -176,9 +178,13 @@ class Pix2PixModel(BaseModel):
                 if cnt < 10:
                     if self.opt.input_nc == 6:
                         A, D = torch.split(self.real_A[j], 3, dim=0)
-                        sample = [A, D, self.real_B[j], self.fake_B[j]]
+                        identity, residual = get_only_grids(self.netG, self.real_A[j])
+                        M = util.visualizate_grid(identity, residual, img_size=(256, 256))  # dense motion field
+                        sample = [A, M, D, self.real_B[j], self.fake_B[j]]
                         sample_im = util.tensor2im(torch.cat(sample, dim=2))
                         util.save_image(sample_im, os.path.join(save_dir, 'sample', '%s.png' % name), create_dir=True)
+                        if self.opt.use_wandb: 
+                            wandb.log({"sample": [wandb.Image(sample_im)]}, step=step)
                     else:
                         input_im = util.tensor2im(self.real_A[j])
                         real_im = util.tensor2im(self.real_B[j])

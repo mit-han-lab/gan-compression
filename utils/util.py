@@ -11,6 +11,12 @@ import numpy as np
 import torch
 from PIL import Image
 from torch import nn
+from torch.functional import F
+import cv2
+
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 
 
 def atoi(text):
@@ -237,3 +243,28 @@ def find_class_in_module(target_cls_name, module):
         exit(0)
 
     return cls
+
+
+def visualizate_grid(identity, residual, img_size=(256, 256)):
+    '''Visualize dense motion grid. 
+    
+    Returns an RGB-image (`np.array`) resized to `img_size`
+    '''
+    X, Y = identity.squeeze(0).permute(2, 0, 1)
+    U, V = residual.squeeze(0).permute(2, 0, 1)
+    M = np.hypot(U, V)
+    # dense motion vector field plot
+    fig, ax = plt.subplots(figsize=(10, 10))
+    canvas = FigureCanvas(fig)
+    ax = fig.gca()
+    ax.quiver(X, Y, U, V, M, pivot='tip', units='width', cmap=plt.get_cmap('Blues') )
+    ax.axis('off')
+    # plt.show();
+    canvas.draw()  # draw the canvas, cache the renderer
+    # return as an image
+    width, height = fig.get_size_inches() * fig.get_dpi()
+    width, height = int(width), int(height)
+    image = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
+    image = image.reshape(height, width, 3)
+    image = cv2.resize(image, img_size)
+    return image

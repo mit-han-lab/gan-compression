@@ -66,6 +66,7 @@ class Trainer:
         self.model.save_networks('latest')
 
     def start(self):
+        
         opt = self.opt
         dataset = self.dataloader
         model = self.model
@@ -87,8 +88,11 @@ class Trainer:
                     logger.plot(losses, total_iter)
 
                 if total_iter % opt.save_latest_freq == 0 or total_iter == opt.iter_base:
-                    self.evaluate(epoch, total_iter,
-                                  'Saving the latest model (epoch %d, total_steps %d)' % (epoch, total_iter))
+                    self.evaluate(
+                        epoch, 
+                        total_iter,
+                        'Saving the latest model (epoch %d, total_steps %d)' % (epoch, total_iter)
+                    )
                     if model.is_best:
                         model.save_networks('iter%d' % total_iter)
 
@@ -96,7 +100,10 @@ class Trainer:
             logger.print_info(
                 'End of epoch %d / %d \t Time Taken: %.2f sec' % (epoch, end_epoch, time.time() - epoch_start_time))
             if epoch % opt.save_epoch_freq == 0 or epoch == end_epoch:
-                self.evaluate(epoch, total_iter,
-                              'Saving the model at the end of epoch %d, iters %d' % (epoch, total_iter))
+                self.evaluate(
+                    epoch, 
+                    total_iter,
+                    'Saving the model at the end of epoch %d, iters %d' % (epoch, total_iter)
+                )
                 model.save_networks(epoch)
             model.update_learning_rate(logger)
