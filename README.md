@@ -1,5 +1,5 @@
 # GAN Compression
-### [paper](https://arxiv.org/abs/2003.08936) | [demo](https://tinyurl.com/r474uca)
+### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [demo](https://tinyurl.com/r474uca)
 
 **[NEW!]** The compressed model and test codes of GauGAN are released! Check [here](#gaugan) to use our models.
 
