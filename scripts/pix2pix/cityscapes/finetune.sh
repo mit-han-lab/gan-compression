@@ -8,7 +8,7 @@ python train_supernet.py --dataroot database/cityscapes \
   --real_stat_path real_stat/cityscapes_A.npz \
   --nepochs 100 --nepochs_decay 150 \
   --save_latest_freq 25000 --save_epoch_freq 25 \
-  --teacher_ngf 96 --config_str 32_32_40_48_48_48_24_24 \
+  --teacher_ngf 96 --config_str $1 \
   --drn_path drn-d-105_ms_cityscapes.pth \
   --cityscapes_path database/cityscapes-origin \
   --table_path datasets/table.txt \
