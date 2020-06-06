@@ -1,5 +1,6 @@
 import math
 import os
+import threading
 
 import numpy as np
 import torch
@@ -10,21 +11,12 @@ from torch.utils.data import Dataset, DataLoader
 from . import drn
 
 
-# from tqdm import tqdm
-
-
-class Resize(object):
+class FromArray(object):
     def __init__(self, size):
         self.size = size
 
     def __call__(self, image_numpy, label):
         image = Image.fromarray(image_numpy)
-        interpolation = Image.CUBIC
-        w, h = image.size
-        tw, th = self.size
-        if w != tw or h != th:
-            image = image.resize((tw, th), interpolation)
-
         return image, label
 
 
@@ -83,7 +75,7 @@ class SegList(Dataset):
         self.table_path = table_path
         self.data_dir = data_dir
         self.transforms = Compose([
-            Resize([2048, 1024]),
+            FromArray([2048, 1024]),
             ToTensor(),
             Normalize(mean=[0.29010095242892997, 0.32808144844279574, 0.28696394422942517],
                       std=[0.1829540508368939, 0.18656561047509476, 0.18447508988480435])
@@ -174,6 +166,33 @@ def fast_hist(pred, label, n):
         n * label[k].astype(int) + pred[k], minlength=n ** 2).reshape(n, n)
 
 
+def resize_4d_tensor(tensor, width, height):
+    """
+    tensor: the semantic label tensor of shape [B, C, H, W]
+    width: target width
+    height: target height
+    """
+    tensor_cpu = tensor.cpu().numpy()
+    if tensor.size(2) == height and tensor.size(3) == width:
+        return tensor_cpu
+    out_size = (tensor.size(0), tensor.size(1), height, width)
+    out = np.empty(out_size, dtype=np.float32)
+
+    def resize_channel(j):
+        for i in range(tensor.size(0)):
+            out[i, j] = np.array(
+                Image.fromarray(tensor_cpu[i, j]).resize(
+                    (width, height), Image.BILINEAR))
+
+    workers = [threading.Thread(target=resize_channel, args=(j,))
+               for j in range(tensor.size(1))]
+    for w in workers:
+        w.start()
+    for w in workers:
+        w.join()
+    return out
+
+
 def test(fakes, names, model, device, table_path='datasets/table.txt', data_dir='database/cityscapes',
          batch_size=1, num_workers=8, num_classes=19, use_tqdm=True):
     dataset = SegList(fakes, names, table_path, data_dir)
@@ -190,8 +209,8 @@ def test(fakes, names, model, device, table_path='datasets/table.txt', data_dir=
         for iter, (image, label) in enumerate(tqdm(eval_dataloader)):
             image = image.to(device)
             final = model(image)[0]
-            _, pred = torch.max(final, 1)
-            pred = pred.cpu().numpy()
+            final = resize_4d_tensor(final, 2048, 1024)
+            pred = final.argmax(axis=1)
             label = label.numpy()
             hist += fast_hist(pred.flatten(), label.flatten(), num_classes)
 

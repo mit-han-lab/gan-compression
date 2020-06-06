@@ -10,7 +10,7 @@ from configs import decode_config
 from configs.resnet_configs import get_configs
 from configs.single_configs import SingleConfigs
 from distillers.base_resnet_distiller import BaseResnetDistiller
-from metric import get_fid, get_mAP
+from metric import get_fid, get_mIoU
 from models.modules.super_modules import SuperConv2d
 from utils import util
 
@@ -30,10 +30,10 @@ class ResnetSupernet(BaseResnetDistiller):
         super(ResnetSupernet, self).__init__(opt)
         self.best_fid_largest = 1e9
         self.best_fid_smallest = 1e9
-        self.best_mAP_largest = -1e9
-        self.best_mAP_smallest = -1e9
+        self.best_mIoU_largest = -1e9
+        self.best_mIoU_smallest = -1e9
         self.fids_largest, self.fids_smallest = [], []
-        self.mAPs_largest, self.mAPs_smallest = [], []
+        self.mIoUs_largest, self.mIoUs_smallest = [], []
         if opt.config_set is not None:
             assert opt.config_str is None
             self.configs = get_configs(opt.config_set)
@@ -147,22 +147,22 @@ class ResnetSupernet(BaseResnetDistiller):
             ret['metric/fid_%s-best' % config_name] = getattr(self, 'best_fid_%s' % config_name)
 
             if 'cityscapes' in self.opt.dataroot:
-                mAP = get_mAP(fakes, names, self.drn_model, self.device,
-                              table_path=self.opt.table_path,
-                              data_dir=self.opt.cityscapes_path,
-                              batch_size=self.opt.eval_batch_size,
-                              num_workers=self.opt.num_threads)
-                if mAP > getattr(self, 'best_mAP_%s' % config_name):
+                mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
+                               table_path=self.opt.table_path,
+                               data_dir=self.opt.cityscapes_path,
+                               batch_size=self.opt.eval_batch_size,
+                               num_workers=self.opt.num_threads)
+                if mIoU > getattr(self, 'best_mIoU_%s' % config_name):
                     self.is_best = True
-                    setattr(self, 'best_mAP_%s' % config_name, mAP)
-                mAPs = getattr(self, 'mAPs_%s' % config_name)
-                mAPs.append(mAP)
-                if len(mAPs) > 3:
-                    mAPs.pop(0)
-                ret['metric/mAP_%s' % config_name] = mAP
-                ret['metric/mAP_%s-mean' % config_name] = sum(getattr(self, 'mAPs_%s' % config_name)) / len(
-                    getattr(self, 'mAPs_%s' % config_name))
-                ret['metric/mAP_%s-best' % config_name] = getattr(self, 'best_mAP_%s' % config_name)
+                    setattr(self, 'best_mIoU_%s' % config_name, mIoU)
+                mIoUs = getattr(self, 'mIoUs_%s' % config_name)
+                mIoUs.append(mIoU)
+                if len(mIoUs) > 3:
+                    mIoUs.pop(0)
+                ret['metric/mIoU_%s' % config_name] = mIoU
+                ret['metric/mIoU_%s-mean' % config_name] = sum(getattr(self, 'mIoUs_%s' % config_name)) / len(
+                    getattr(self, 'mIoUs_%s' % config_name))
+                ret['metric/mIoU_%s-best' % config_name] = getattr(self, 'best_mIoU_%s' % config_name)
 
         self.netG_student.train()
         return ret

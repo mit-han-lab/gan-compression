@@ -9,9 +9,9 @@ from torch import nn
 
 from configs import decode_config
 from data import create_dataloader
-from metric import get_mAP, get_fid
+from metric import get_mIoU, get_fid
 from metric.inception import InceptionV3
-from metric.mAP_score import DRNSeg
+from metric.mIoU_score import DRNSeg
 from models import create_model
 from options.test_options import TestOptions
 from utils import html, util
@@ -97,17 +97,17 @@ if __name__ == '__main__':
     webpage.save()  # save the HTML
     device = model.device
 
-    if 'cityscapes' in opt.dataroot and not opt.no_mAP and opt.direction == 'BtoA':
+    if 'cityscapes' in opt.dataroot and not opt.no_mIoU and opt.direction == 'BtoA':
         drn_model = DRNSeg('drn_d_105', 19, pretrained=False)
         util.load_network(drn_model, opt.drn_path, verbose=False)
         if len(opt.gpu_ids) > 0:
             drn_model = nn.DataParallel(drn_model, opt.gpu_ids)
         drn_model.eval()
-        mAP = get_mAP(fakes, names, drn_model, device,
-                      data_dir=opt.cityscapes_path,
-                      batch_size=opt.batch_size,
-                      num_workers=opt.num_threads)
-        print('mAP: %.2f' % mAP)
+        mIoU = get_mIoU(fakes, names, drn_model, device,
+                        data_dir=opt.cityscapes_path,
+                        batch_size=opt.batch_size,
+                        num_workers=opt.num_threads)
+        print('mIoU: %.2f' % mIoU)
 
     if not opt.no_fid:
         print('Calculating FID...', flush=True)

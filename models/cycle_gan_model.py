@@ -9,9 +9,9 @@ from tqdm import tqdm
 
 import models.modules.loss
 from data import create_eval_dataloader
-from metric import get_fid, get_mAP
+from metric import get_fid, get_mIoU
 from metric.inception import InceptionV3
-from metric.mAP_score import DRNSeg
+from metric.mIoU_score import DRNSeg
 from models import networks
 from models.base_model import BaseModel
 from utils import util
@@ -150,9 +150,9 @@ class CycleGANModel(BaseModel):
             self.drn_model.eval()
 
         self.best_fid_A, self.best_fid_B = 1e9, 1e9
-        self.best_mAP = -1e9
+        self.best_mIoU = -1e9
         self.fids_A, self.fids_B = [], []
-        self.mAPs = []
+        self.mIoUs = []
         self.is_best = False
         self.npz_A = np.load(opt.real_stat_A_path)
         self.npz_B = np.load(opt.real_stat_B_path)
@@ -308,20 +308,20 @@ class CycleGANModel(BaseModel):
             ret['metric/fid_%s-best' % suffix] = getattr(self, 'best_fid_%s' % suffix)
 
             if 'cityscapes' in self.opt.dataroot and direction == 'BtoA':
-                mAP = get_mAP(fakes, names, self.drn_model, self.device,
-                              table_path=self.opt.table_path,
-                              data_dir=self.opt.cityscapes_path,
-                              batch_size=self.opt.eval_batch_size,
-                              num_workers=self.opt.num_threads)
-                if mAP > self.best_mAP:
+                mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
+                               table_path=self.opt.table_path,
+                               data_dir=self.opt.cityscapes_path,
+                               batch_size=self.opt.eval_batch_size,
+                               num_workers=self.opt.num_threads)
+                if mIoU > self.best_mIoU:
                     self.is_best = True
-                    self.best_mAP = mAP
-                self.mAPs.append(mAP)
-                if len(self.mAPs) > 3:
-                    self.mAPs = self.mAPs[1:]
-                ret['metric/mAP'] = mAP
-                ret['metric/mAP-mean'] = sum(self.mAPs) / len(self.mAPs)
-                ret['metric/mAP-best'] = self.best_mAP
+                    self.best_mIoU = mIoU
+                self.mIoUs.append(mIoU)
+                if len(self.mIoUs) > 3:
+                    self.mIoUs = self.mIoUs[1:]
+                ret['metric/mIoU'] = mIoU
+                ret['metric/mIoU-mean'] = sum(self.mIoUs) / len(self.mIoUs)
+                ret['metric/mIoU-best'] = self.best_mIoU
 
         self.netG_A.train()
         self.netG_B.train()

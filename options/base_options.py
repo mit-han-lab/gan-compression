@@ -69,7 +69,7 @@ class BaseOptions:
 
         # evaluation parameters
         parser.add_argument('--drn_path', type=str, default='drn-d-105_ms_cityscapes.pth',
-                            help='the path to the pretrained drn path to compute mAP')
+                            help='the path to the pretrained drn path to compute mIoU')
         parser.add_argument('--cityscapes_path', type=str, default='database/cityscapes-origin',
                             help='the original cityscapes dataset path (not the pix2pix preprocessed one)')
         parser.add_argument('--table_path', type=str, default='datasets/table.txt',

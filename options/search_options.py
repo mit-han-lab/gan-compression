@@ -26,10 +26,12 @@ class SearchOptions(BaseOptions):
                             help='specify generator architecture')
         parser.add_argument('--ngf', type=int, default=48, help='the base number of filters of the student generator')
         parser.add_argument('--dropout_rate', type=float, default=0, help='the dropout rate of the generator')
+        parser.add_argument('--budget', type=float, default=1e18, help='the MAC budget')
+        parser.add_argument('--real_stat_path', type=str, required=True,
+                            help='the path to load the ground-truth images information to compute FID.')
+
         # rewrite devalue values
         parser.set_defaults(phase='val', serial_batches=True, no_flip=True,
                             load_size=parser.get_default('crop_size'), load_in_memory=True)
 
-        parser.add_argument('--real_stat_path', type=str, required=True,
-                            help='the path to load the ground-truth images information to compute FID.')
         return parser

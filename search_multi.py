@@ -15,9 +15,9 @@ from torch.backends import cudnn
 
 from configs import encode_config
 from data import create_dataloader
-from metric import get_fid, get_mAP
+from metric import get_fid, get_mIoU
 from metric.inception import InceptionV3
-from metric.mAP_score import DRNSeg
+from metric.mIoU_score import DRNSeg
 from models import create_model
 from options.search_options import SearchOptions
 from utils import util
@@ -65,31 +65,49 @@ def main(configs, opt, gpu_id, queue, verbose):
 
     npz = np.load(opt.real_stat_path)
     results = []
+
+    for data_i in dataloader:
+        model.set_input(data_i)
+        break
+
     for config in tqdm.tqdm(configs):
+        qualified = True
+        macs, _ = model.profile(config)
+        if macs > opt.budget:
+            qualified = False
+        else:
+            qualified = True
+
         fakes, names = [], []
-        for i, data_i in enumerate(dataloader):
-            model.set_input(data_i)
-            if i == 0:
-                macs, _ = model.profile(config)
-            model.test(config)
-            fakes.append(model.fake_B.cpu())
-            for path in model.get_image_paths():
-                short_path = ntpath.basename(path)
-                name = os.path.splitext(short_path)[0]
-                names.append(name)
+
+        if qualified:
+            for i, data_i in enumerate(dataloader):
+                model.set_input(data_i)
+
+                model.test(config)
+                fakes.append(model.fake_B.cpu())
+                for path in model.get_image_paths():
+                    short_path = ntpath.basename(path)
+                    name = os.path.splitext(short_path)[0]
+                    names.append(name)
 
         result = {'config_str': encode_config(config), 'macs': macs}
         if not opt.no_fid:
-            fid = get_fid(fakes, inception_model, npz, device, opt.batch_size, use_tqdm=False)
-            result['fid'] = fid
+            if qualified:
+                fid = get_fid(fakes, inception_model, npz, device, opt.batch_size, use_tqdm=False)
+                result['fid'] = fid
+            else:
+                result['fid'] = 1e9
         if 'cityscapes' in opt.dataroot and opt.direction == 'BtoA':
-            mAP = get_mAP(fakes, names, drn_model, device,
-                          data_dir=opt.cityscapes_path,
-                          batch_size=opt.batch_size,
-                          num_workers=opt.num_threads, use_tqdm=False)
-            result['mAP'] = mAP
+            if qualified:
+                mIoU = get_mIoU(fakes, names, drn_model, device,
+                                data_dir=opt.cityscapes_path,
+                                batch_size=opt.batch_size,
+                                num_workers=opt.num_threads, use_tqdm=False)
+                result['mIoU'] = mIoU
+            else:
+                result['mIoU'] = mIoU
         print(result, flush=True)
-        # print('Time Cost: %.2fmin' % ((time.time() - start_time) / 60), flush=True)
         results.append(result)
     queue.put(results)
 

@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch import nn
 from tqdm import tqdm
 
-from metric import get_fid, get_mAP
+from metric import get_fid, get_mIoU
 from utils import util
 from utils.weight_transfer import load_pretrained_weight
 from .base_resnet_distiller import BaseResnetDistiller
@@ -29,8 +29,8 @@ class ResnetDistiller(BaseResnetDistiller):
         assert opt.isTrain
         super(ResnetDistiller, self).__init__(opt)
         self.best_fid = 1e9
-        self.best_mAP = -1e9
-        self.fids, self.mAPs = [], []
+        self.best_mIoU = -1e9
+        self.fids, self.mIoUs = [], []
         self.npz = np.load(opt.real_stat_path)
 
     def forward(self):
@@ -127,19 +127,19 @@ class ResnetDistiller(BaseResnetDistiller):
             self.fids.pop(0)
         ret = {'metric/fid': fid, 'metric/fid-mean': sum(self.fids) / len(self.fids), 'metric/fid-best': self.best_fid}
         if 'cityscapes' in self.opt.dataroot and self.opt.direction == 'BtoA':
-            mAP = get_mAP(fakes, names, self.drn_model, self.device,
-                          table_path=self.opt.table_path,
-                          data_dir=self.opt.cityscapes_path,
-                          batch_size=self.opt.eval_batch_size,
-                          num_workers=self.opt.num_threads)
-            if mAP > self.best_mAP:
+            mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
+                           table_path=self.opt.table_path,
+                           data_dir=self.opt.cityscapes_path,
+                           batch_size=self.opt.eval_batch_size,
+                           num_workers=self.opt.num_threads)
+            if mIoU > self.best_mIoU:
                 self.is_best = True
-                self.best_mAP = mAP
-            self.mAPs.append(mAP)
-            if len(self.mAPs) > 3:
-                self.mAPs = self.mAPs[1:]
-            ret['metric/mAP'] = mAP
-            ret['metric/mAP-mean'] = sum(self.mAPs) / len(self.mAPs)
-            ret['metric/mAP-best'] = self.best_mAP
+                self.best_mIoU = mIoU
+            self.mIoUs.append(mIoU)
+            if len(self.mIoUs) > 3:
+                self.mIoUs = self.mIoUs[1:]
+            ret['metric/mIoU'] = mIoU
+            ret['metric/mIoU-mean'] = sum(self.mIoUs) / len(self.mIoUs)
+            ret['metric/mIoU-best'] = self.best_mIoU
         self.netG_student.train()
         return ret

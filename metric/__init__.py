@@ -2,7 +2,7 @@ import torch
 
 from metric.fid_score import _compute_statistics_of_ims, calculate_frechet_distance
 from utils import util
-from .mAP_score import test
+from .mIoU_score import test
 
 
 def get_fid(fakes, model, npz, device, batch_size=1, use_tqdm=True):
@@ -14,11 +14,11 @@ def get_fid(fakes, model, npz, device, batch_size=1, use_tqdm=True):
     return float(calculate_frechet_distance(m1, s1, m2, s2))
 
 
-def get_mAP(fakes, names, model, device,
-            table_path='datasets/table.txt',
-            data_dir='database/cityscapes',
-            batch_size=1, num_workers=8, num_classes=19,
-            use_tqdm=True):
+def get_mIoU(fakes, names, model, device,
+             table_path='datasets/table.txt',
+             data_dir='database/cityscapes',
+             batch_size=1, num_workers=8, num_classes=19,
+             use_tqdm=True):
     fakes = torch.cat(fakes, dim=0)
     fakes = util.tensor2im(fakes)
     mAP = test(fakes, names, model, device, table_path=table_path, data_dir=data_dir,
