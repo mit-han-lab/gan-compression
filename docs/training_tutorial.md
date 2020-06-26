@@ -9,7 +9,7 @@
 
 ### Preparations
 
-Please refer to our [README](../README.md) for the installation, dataset preparations, and the evaluation (FID and mAP).
+Please refer to our [README](../README.md) for the installation, dataset preparations, and the evaluation (FID and mIoU).
 
 ### Pipeline
 
@@ -83,7 +83,7 @@ bash scripts/pix2pix/edges2shoes-r/search.sh
 The search result will be stored in the python `pickle` form. The pickle file is a python `list` object that stores all the candidate sub-networks information, whose element is a python `dict ` object in the form of
 
 ```
-{'config_str': $config_str, 'macs': $macs, 'fid'/'mAP': $fid_or_mAP}
+{'config_str': $config_str, 'macs': $macs, 'fid'/'mIoU': $fid_or_mIoU}
 ```
 
 such as
@@ -119,7 +119,7 @@ bash scripts/pix2pix/edges2shoes-r/export.sh 32_32_48_32_48_48_16_16
 
 ##### Cityscapes
 
-For the Cityscapes dataset, you need to specify additional options to support mAP evaluation while training. Please refer to the scripts in [scripts/pix2pix/cityscapes](../scripts/pix2pix/cityscapes) for more details.
+For the Cityscapes dataset, you need to specify additional options to support mIoU evaluation while training. Please refer to the scripts in [scripts/pix2pix/cityscapes](../scripts/pix2pix/cityscapes) for more details.
 
 ## CycleGAN Model Compression
 
