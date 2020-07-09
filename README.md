@@ -1,6 +1,8 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [demo](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex)
 
+**[NEW!]** GauGAN training code and tutorial is released! Check the [tutorial](docs/training_tutorial.md) to compress GauGAN.
+
 **[NEW!]** Correct metric naming and update the evaluation protocol. Support MACs budget for searching.
 
 **[NEW!]** The compressed model and test codes of GauGAN are released! Check [here](#gaugan) to use our models.

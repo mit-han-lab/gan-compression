@@ -44,6 +44,9 @@ class DistillOptions(BaseOptions):
                                  'n_layers allows you to specify the layers in the discriminator')
         parser.add_argument('--ndf', type=int, default=128, help='the base number of discriminator filters')
         parser.add_argument('--n_layers_D', type=int, default=3, help='only used if netD==n_layers')
+        parser.add_argument('--gan_mode', type=str, default='hinge', choices=['lsgan', 'vanilla', 'hinge'],
+                            help='the type of GAN objective. [vanilla| lsgan | hinge]. '
+                                 'vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 
         # training parameters
         parser.add_argument('--nepochs', type=int, default=5,

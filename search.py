@@ -17,6 +17,7 @@ from metric import get_fid, get_mIoU
 from metric.inception import InceptionV3
 from metric.mIoU_score import DRNSeg
 from models import create_model
+from models.spade_model import SPADEModel
 from options.search_options import SearchOptions
 from utils import util
 
@@ -35,7 +36,6 @@ def check(opt):
     assert opt.serial_batches
     assert opt.no_flip
     assert opt.load_size == opt.crop_size
-    assert opt.preprocess == 'resize_and_crop'
     assert opt.config_set is not None
     if len(opt.gpu_ids) > 1:
         warnings.warn('The code only supports single GPU. Only gpu [%d] will be used.' % opt.gpu_ids[0])
@@ -52,8 +52,7 @@ if __name__ == '__main__':
     if 'resnet' in opt.netG:
         from configs.resnet_configs import get_configs
     elif 'spade' in opt.netG:
-        # TODO
-        raise NotImplementedError
+        from configs.spade_configs import get_configs
     else:
         raise NotImplementedError
     configs = get_configs(config_name=opt.config_set)
@@ -94,6 +93,8 @@ if __name__ == '__main__':
         fakes, names = [], []
 
         if qualified:
+            if isinstance(model, SPADEModel):
+                model.calibrate(config)
             for i, data_i in enumerate(dataloader):
                 model.set_input(data_i)
                 model.test(config)
@@ -113,10 +114,10 @@ if __name__ == '__main__':
         if 'cityscapes' in opt.dataroot and opt.direction == 'BtoA':
             if qualified:
                 mIoU = get_mIoU(fakes, names, drn_model, device,
-                              data_dir=opt.cityscapes_path,
-                              batch_size=opt.batch_size,
-                              num_workers=opt.num_threads,
-                              use_tqdm=False)
+                                data_dir=opt.cityscapes_path,
+                                batch_size=opt.batch_size,
+                                num_workers=opt.num_threads,
+                                use_tqdm=False)
                 result['mIoU'] = mIoU
             else:
                 result['mIoU'] = 0

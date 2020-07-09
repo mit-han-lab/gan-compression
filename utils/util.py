@@ -133,15 +133,6 @@ def save_image(image_numpy, image_path, create_dir=False):
     image_pil.save(image_path.replace('.jpg', '.png'))
 
 
-def save_network(net, label, epoch, opt):
-    save_filename = '%s_net_%s.pth' % (epoch, label)
-    os.makedirs(os.path.join(opt.log_dir, 'checkpoints'), exist_ok=True)
-    save_path = os.path.join(opt.log_dir, 'checkpoints', save_filename)
-    torch.save(net.cpu().state_dict(), save_path)
-    if len(opt.gpu_ids) and torch.cuda.is_available():
-        net.cuda()
-
-
 def load_network(net, load_path, verbose=True):
     if verbose:
         print('Load network at %s' % load_path)
@@ -150,6 +141,14 @@ def load_network(net, load_path, verbose=True):
         net = net.module
     net.load_state_dict(weights)
     return net
+
+
+def load_optimizer(optimizer, load_path, verbose=True):
+    if verbose:
+        print('Load optimizer at %s' % load_path)
+    weights = torch.load(load_path)
+    optimizer.load_state_dict(weights)
+    return optimizer
 
 
 ###############################################################################

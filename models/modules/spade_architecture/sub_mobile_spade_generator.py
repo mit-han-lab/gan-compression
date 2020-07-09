@@ -64,13 +64,6 @@ class SubMobileSPADEResnetBlock(nn.Module):
 class SubMobileSPADEGenerator(BaseNetwork):
     @staticmethod
     def modify_commandline_options(parser, is_train):
-        parser.add_argument('--norm_G', type=str, default='spadesyncbatch3x3',
-                            help='instance normalization or batch normalization')
-        parser.add_argument('--num_upsampling_layers',
-                            choices=('normal', 'more', 'most'), default='more',
-                            help="If 'more', adds upsampling layer between the two middle resnet blocks. "
-                                 "If 'most', also add one more upsampling + resnet layer at the end of the generator")
-
         return parser
 
     def __init__(self, opt, config):

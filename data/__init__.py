@@ -65,6 +65,24 @@ def create_eval_dataloader(opt, direction=None):
     return dataloader
 
 
+def create_train_dataloader(opt, direction=None):
+    opt = copy.deepcopy(opt)
+    # Set some evaluation options
+    # opt.prepocess = 'resize_and_crop'
+    opt.no_flip = False
+    opt.serial_batches = False
+    opt.phase = 'train'
+    opt.load_in_memory = False
+    opt.max_dataset_size = 256
+    if opt.dataset_mode == 'unaligned':
+        assert direction is not None
+        opt.dataset_mode = 'single'
+        opt.dataroot = os.path.join(opt.dataroot, 'val%s' % (direction[0]))
+    dataloader = CustomDatasetDataLoader(opt)
+    dataloader = dataloader.load_data()
+    return dataloader
+
+
 class CustomDatasetDataLoader():
     """Wrapper class of Dataset class that performs multi-threaded data loading"""
 

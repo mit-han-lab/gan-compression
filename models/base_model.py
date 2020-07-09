@@ -6,7 +6,7 @@ import torch
 
 from utils import util
 from . import networks
-
+from torch.nn import DataParallel
 
 class BaseModel(ABC):
     """This class is an abstract base class (ABC) for models.
@@ -75,7 +75,7 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def optimize_parameters(self):
+    def optimize_parameters(self, steps):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         pass
 
@@ -192,7 +192,10 @@ class BaseModel(ABC):
                 save_path = os.path.join(self.save_dir, save_filename)
                 net = getattr(self, 'net' + name)
                 if len(self.gpu_ids) > 0 and torch.cuda.is_available():
-                    torch.save(net.module.cpu().state_dict(), save_path)
+                    if isinstance(net, DataParallel):
+                        torch.save(net.module.cpu().state_dict(), save_path)
+                    else:
+                        torch.save(net.cpu().state_dict(), save_path)
                     net.cuda(self.gpu_ids[0])
                 else:
                     torch.save(net.cpu().state_dict(), save_path)

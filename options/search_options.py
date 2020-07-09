@@ -22,7 +22,7 @@ class SearchOptions(BaseOptions):
                                  'you can only activate this when the dataset is cityscapes!!!')
         parser.add_argument('--restore_G_path', type=str, required=True, help='the path to restore the generator')
         parser.add_argument('--netG', type=str, default='super_mobile_resnet_9blocks',
-                            choices=['super_mobile_resnet_9blocks'],
+                            choices=['super_mobile_resnet_9blocks', 'super_mobile_spade'],
                             help='specify generator architecture')
         parser.add_argument('--ngf', type=int, default=48, help='the base number of filters of the student generator')
         parser.add_argument('--dropout_rate', type=float, default=0, help='the dropout rate of the generator')

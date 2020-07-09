@@ -1,6 +1,9 @@
-import torch
+import argparse
+
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.utils import remove_spectral_norm
+from torch.nn.utils import spectral_norm
 
 from models.networks import BaseNetwork
 from .normalization import MobileSPADE
@@ -18,15 +21,22 @@ class MobileSPADEResnetBlock(nn.Module):
         self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=1)
         if self.learned_shortcut:
             self.conv_s = nn.Conv2d(fin, fout, kernel_size=1, bias=False)
-
+        if 'spectral' in opt.norm_G:
+            self.conv_0 = spectral_norm(self.conv_0)
+            self.conv_1 = spectral_norm(self.conv_1)
+            if self.learned_shortcut:
+                self.conv_s = spectral_norm(self.conv_s)
         # apply spectral norm if specified
 
         # define normalization layers
-        spade_config_str = opt.norm_G
-        self.norm_0 = MobileSPADE(spade_config_str, fin, opt.semantic_nc, nhidden=opt.ngf * 2)
-        self.norm_1 = MobileSPADE(spade_config_str, fmiddle, opt.semantic_nc, nhidden=opt.ngf * 2)
+        spade_config_str = opt.norm_G.replace('spectral', '')
+        self.norm_0 = MobileSPADE(spade_config_str, fin, opt.semantic_nc,
+                                  nhidden=opt.ngf * 2, separable_conv_norm=opt.separable_conv_norm)
+        self.norm_1 = MobileSPADE(spade_config_str, fmiddle, opt.semantic_nc,
+                                  nhidden=opt.ngf * 2, separable_conv_norm=opt.separable_conv_norm)
         if self.learned_shortcut:
-            self.norm_s = MobileSPADE(spade_config_str, fin, opt.semantic_nc, nhidden=opt.ngf * 2)
+            self.norm_s = MobileSPADE(spade_config_str, fin, opt.semantic_nc,
+                                      nhidden=opt.ngf * 2, separable_conv_norm=opt.separable_conv_norm)
 
     # note the resnet block with SPADE also takes in |seg|,
     # the semantic segmentation map as input
@@ -50,17 +60,17 @@ class MobileSPADEResnetBlock(nn.Module):
     def actvn(self, x):
         return F.leaky_relu(x, 2e-1)
 
+    def remove_spectral_norm(self):
+        self.conv_0 = remove_spectral_norm(self.conv_0)
+        self.conv_1 = remove_spectral_norm(self.conv_1)
+        if self.learned_shortcut:
+            self.conv_s = remove_spectral_norm(self.conv_s)
+
 
 class MobileSPADEGenerator(BaseNetwork):
     @staticmethod
     def modify_commandline_options(parser, is_train):
-        parser.add_argument('--norm_G', type=str, default='spadesyncbatch3x3',
-                            help='instance normalization or batch normalization')
-        parser.add_argument('--num_upsampling_layers',
-                            choices=('normal', 'more', 'most'), default='more',
-                            help="If 'more', adds upsampling layer between the two middle resnet blocks. "
-                                 "If 'most', also add one more upsampling + resnet layer at the end of the generator")
-
+        assert isinstance(parser, argparse.ArgumentParser)
         return parser
 
     def __init__(self, opt):
@@ -109,46 +119,78 @@ class MobileSPADEGenerator(BaseNetwork):
 
         return sw, sh
 
-    def forward(self, input, z=None):
+    def forward(self, input, mapping_layers=[]):
         seg = input
 
-        if self.opt.use_vae:
-            # we sample z from unit normal and reshape the tensor
-            if z is None:
-                z = torch.randn(input.size(0), self.opt.z_dim,
-                                dtype=torch.float32, device=input.get_device())
-            x = self.fc(z)
-            x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
-        else:
-            # we downsample segmap and run convolution
-            x = F.interpolate(seg, size=(self.sh, self.sw))
-            x = self.fc(x)
+        ret_acts = {}
+
+        # we downsample segmap and run convolution
+        x = F.interpolate(seg, size=(self.sh, self.sw))
+        x = self.fc(x)
+
+        if 'fc' in mapping_layers:
+            ret_acts['fc'] = x
 
         x = self.head_0(x, seg)
+        if 'head_0' in mapping_layers:
+            ret_acts['head_0'] = x
 
         x = self.up(x)
         x = self.G_middle_0(x, seg)
+
+        if 'G_middle_0' in mapping_layers:
+            ret_acts['G_middle_0'] = x
 
         if self.opt.num_upsampling_layers == 'more' or \
                 self.opt.num_upsampling_layers == 'most':
             x = self.up(x)
 
         x = self.G_middle_1(x, seg)
+        if 'G_middle_1' in mapping_layers:
+            ret_acts['G_middle_1'] = x
 
         x = self.up(x)
         x = self.up_0(x, seg)
+        if 'up_0' in mapping_layers:
+            ret_acts['up_0'] = x
+
         x = self.up(x)
         x = self.up_1(x, seg)
+        if 'up_1' in mapping_layers:
+            ret_acts['up_1'] = x
+
         x = self.up(x)
         x = self.up_2(x, seg)
+        if 'up_2' in mapping_layers:
+            ret_acts['up_2'] = x
+
         x = self.up(x)
         x = self.up_3(x, seg)
+        if 'up_3' in mapping_layers:
+            ret_acts['up_3'] = x
 
         if self.opt.num_upsampling_layers == 'most':
             x = self.up(x)
             x = self.up_4(x, seg)
+            if 'up_4' in mapping_layers:
+                ret_acts['up_4'] = x
 
         x = self.conv_img(F.leaky_relu(x, 2e-1))
         x = F.tanh(x)
+        if len(mapping_layers) == 0:
+            return x
+        else:
+            return x, ret_acts
 
-        return x
+    def remove_spectral_norm(self):
+        x = self.head_0.remove_spectral_norm()
+        x = self.G_middle_0.remove_spectral_norm()
+        x = self.G_middle_1.remove_spectral_norm()
+
+        x = self.up_0.remove_spectral_norm()
+        x = self.up_1.remove_spectral_norm()
+        x = self.up_2.remove_spectral_norm()
+        x = self.up_3.remove_spectral_norm()
+
+        if self.opt.num_upsampling_layers == 'most':
+            x = self.up_4.remove_spectral_norm()

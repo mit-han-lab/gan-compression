@@ -59,13 +59,6 @@ class SuperMobileSPADEResnetBlock(nn.Module):
 class SuperMobileSPADEGenerator(BaseNetwork):
     @staticmethod
     def modify_commandline_options(parser, is_train):
-        parser.add_argument('--norm_G', type=str, default='spadesyncbatch3x3',
-                            help='instance normalization or batch normalization')
-        parser.add_argument('--num_upsampling_layers',
-                            choices=('normal', 'more', 'most'), default='more',
-                            help="If 'more', adds upsampling layer between the two middle resnet blocks. "
-                                 "If 'most', also add one more upsampling + resnet layer at the end of the generator")
-
         return parser
 
     def __init__(self, opt):
@@ -114,31 +107,30 @@ class SuperMobileSPADEGenerator(BaseNetwork):
 
         return sw, sh
 
-    def forward(self, input, acts=None, z=None):
+    def forward(self, input, mapping_layers=[]):
         seg = input
-        if acts is None:
-            acts = []
         ret_acts = {}
+
         # we downsample segmap and run convolution
         x = F.interpolate(seg, size=(self.sh, self.sw))
         channel = self.config['channels'][0]
         x = self.fc(x, {'channel': channel * 16})
-        if 'fc' in acts:
+        if 'fc' in mapping_layers:
             ret_acts['fc'] = x
 
         channel = self.config['channels'][1]
         x = self.head_0(x, seg, {'channel': channel * 16, 'hidden': channel * 2,
                                  'calibrate_bn': self.config.get('calibrate_bn', False)})
-        if 'head_0' in acts:
+        if 'head_0' in mapping_layers:
             ret_acts['head_0'] = x
 
         x = self.up(x)
         channel = self.config['channels'][2]
         x = self.G_middle_0(x, seg, {'channel': channel * 16, 'hidden': channel * 2,
                                      'calibrate_bn': self.config.get('calibrate_bn', False)})
-        if 'G_middle_0' in acts:
+        if 'G_middle_0' in mapping_layers:
             ret_acts['G_middle_0'] = x
-        # print(x.shape)
+
         if self.opt.num_upsampling_layers == 'more' or \
                 self.opt.num_upsampling_layers == 'most':
             x = self.up(x)
@@ -146,38 +138,38 @@ class SuperMobileSPADEGenerator(BaseNetwork):
         channel = self.config['channels'][3]
         x = self.G_middle_1(x, seg, {'channel': channel * 16, 'hidden': channel * 2,
                                      'calibrate_bn': self.config.get('calibrate_bn', False)})
-        if 'G_middle_1' in acts:
+        if 'G_middle_1' in mapping_layers:
             ret_acts['G_middle_1'] = x
         x = self.up(x)
         channel = self.config['channels'][4]
         x = self.up_0(x, seg, {'channel': channel * 8, 'hidden': channel * 2,
                                'calibrate_bn': self.config.get('calibrate_bn', False)})
-        if 'up_0' in acts:
+        if 'up_0' in mapping_layers:
             ret_acts['up_0'] = x
         x = self.up(x)
         channel = self.config['channels'][5]
         x = self.up_1(x, seg, {'channel': channel * 4, 'hidden': channel * 2,
                                'calibrate_bn': self.config.get('calibrate_bn', False)})
-        if 'up_1' in acts:
+        if 'up_1' in mapping_layers:
             ret_acts['up_1'] = x
         x = self.up(x)
         channel = self.config['channels'][6]
         x = self.up_2(x, seg, {'channel': channel * 2, 'hidden': channel * 2,
                                'calibrate_bn': self.config.get('calibrate_bn', False)})
-        if 'up_2' in acts:
+        if 'up_2' in mapping_layers:
             ret_acts['up_2'] = x
         x = self.up(x)
         channel = self.config['channels'][7]
         x = self.up_3(x, seg, {'channel': channel, 'hidden': channel * 2,
                                'calibrate_bn': self.config.get('calibrate_bn', False)})
-        if 'up_3' in acts:
+        if 'up_3' in mapping_layers:
             ret_acts['up_3'] = x
         if self.opt.num_upsampling_layers == 'most':
             raise NotImplementedError
         x = self.conv_img(F.leaky_relu(x, 2e-1), {'channel': self.conv_img.out_channels})
         x = F.tanh(x)
 
-        if len(acts) == 0:
+        if len(mapping_layers) == 0:
             return x
         else:
             return x, ret_acts

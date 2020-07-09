@@ -69,16 +69,27 @@ class GANLoss(nn.Module):
             else:
                 loss = prediction.mean()
         elif self.gan_mode == 'hinge':
-            if for_discriminator:
-                if target_is_real:
-                    minval = torch.min(prediction - 1, self.get_zero_tensor(prediction))
-                    loss = -torch.mean(minval)
-                else:
-                    minval = torch.min(-prediction - 1, self.get_zero_tensor(prediction))
-                    loss = -torch.mean(minval)
+            if isinstance(prediction, list):
+                loss = 0
+                for pred_i in prediction:
+                    if isinstance(pred_i, list):
+                        pred_i = pred_i[-1]
+                    loss_tensor = self(pred_i, target_is_real, for_discriminator)
+                    bs = 1 if len(loss_tensor.size()) == 0 else loss_tensor.size(0)
+                    new_loss = torch.mean(loss_tensor.view(bs, -1), dim=1)
+                    loss += new_loss
+                return loss / len(prediction)
             else:
-                assert target_is_real
-                loss = -torch.mean(prediction)
+                if for_discriminator:
+                    if target_is_real:
+                        minval = torch.min(prediction - 1, self.get_zero_tensor(prediction))
+                        loss = -torch.mean(minval)
+                    else:
+                        minval = torch.min(-prediction - 1, self.get_zero_tensor(prediction))
+                        loss = -torch.mean(minval)
+                else:
+                    assert target_is_real
+                    loss = -torch.mean(prediction)
         else:
             raise NotImplementedError('gan mode %s not implemented' % self.gan_mode)
         return loss
@@ -156,9 +167,9 @@ class VGG19(torch.nn.Module):
 
 
 class VGGLoss(nn.Module):
-    def __init__(self, device):
+    def __init__(self):
         super(VGGLoss, self).__init__()
-        self.vgg = VGG19().to(device)
+        self.vgg = VGG19()
         self.vgg.eval()
         util.set_requires_grad(self.vgg, False)
         self.criterion = nn.L1Loss()

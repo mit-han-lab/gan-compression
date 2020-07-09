@@ -29,7 +29,7 @@ class CityscapesDataset(BaseDataset):
                             help='if specified, do *not* add instance map as input')
         parser.add_argument('--contain_dontcare_label', action='store_true',
                             help='if the label map contains dontcare label (dontcare=255)')
-        parser.set_defaults(preprocess='scale_width', no_flip=True, aspect_ratio=2,
+        parser.set_defaults(preprocess='scale_width', aspect_ratio=2,
                             load_size=512, crop_size=512, direction='BtoA',
                             display_winsize=512, input_nc=35, num_threads=0)
         return parser
@@ -152,4 +152,7 @@ class CityscapesDataset(BaseDataset):
         return input_dict
 
     def __len__(self):
-        return self.dataset_size
+        if self.opt.max_dataset_size == -1:
+            return self.dataset_size
+        else:
+            return self.opt.max_dataset_size

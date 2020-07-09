@@ -7,15 +7,15 @@ import torch
 from torch import nn
 from tqdm import tqdm
 
-import models.modules.loss
 from data import create_eval_dataloader
 from metric import get_fid, get_mIoU
 from metric.inception import InceptionV3
 from metric.mIoU_score import DRNSeg
-from models import networks
-from models.base_model import BaseModel
 from utils import util
 from utils.image_pool import ImagePool
+from . import networks
+from .base_model import BaseModel
+from .modules.loss import GANLoss
 
 
 class CycleGANModel(BaseModel):
@@ -120,7 +120,7 @@ class CycleGANModel(BaseModel):
         self.fake_B_pool = ImagePool(opt.pool_size)  # create image buffer to store previously generated images
 
         # define loss functions
-        self.criterionGAN = models.modules.loss.GANLoss(opt.gan_mode).to(self.device)  # define GAN loss.
+        self.criterionGAN = GANLoss(opt.gan_mode).to(self.device)  # define GAN loss.
         self.criterionCycle = torch.nn.L1Loss()
         self.criterionIdt = torch.nn.L1Loss()
 
@@ -146,6 +146,7 @@ class CycleGANModel(BaseModel):
             self.drn_model = DRNSeg('drn_d_105', 19, pretrained=False)
             util.load_network(self.drn_model, opt.drn_path, verbose=False)
             if len(opt.gpu_ids) > 0:
+                self.drn_model.to(self.device)
                 self.drn_model = nn.DataParallel(self.drn_model, opt.gpu_ids)
             self.drn_model.eval()
 
@@ -241,7 +242,7 @@ class CycleGANModel(BaseModel):
         self.loss_G = self.loss_G_A + self.loss_G_B + self.loss_G_cycle_A + self.loss_G_cycle_B + self.loss_G_idt_A + self.loss_G_idt_B
         self.loss_G.backward()
 
-    def optimize_parameters(self):
+    def optimize_parameters(self, steps):
         """Calculate losses, gradients, and update network weights; called in every training iteration"""
         # forward
         self.forward()  # compute fake images and reconstruction images.
@@ -309,10 +310,10 @@ class CycleGANModel(BaseModel):
 
             if 'cityscapes' in self.opt.dataroot and direction == 'BtoA':
                 mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                               table_path=self.opt.table_path,
-                               data_dir=self.opt.cityscapes_path,
-                               batch_size=self.opt.eval_batch_size,
-                               num_workers=self.opt.num_threads)
+                                table_path=self.opt.table_path,
+                                data_dir=self.opt.cityscapes_path,
+                                batch_size=self.opt.eval_batch_size,
+                                num_workers=self.opt.num_threads)
                 if mIoU > self.best_mIoU:
                     self.is_best = True
                     self.best_mIoU = mIoU

@@ -81,7 +81,7 @@ class ResnetSupernet(BaseResnetDistiller):
         self.loss_G = self.loss_G_gan + self.loss_G_recon + self.loss_G_distill
         self.loss_G.backward()
 
-    def optimize_parameters(self):
+    def optimize_parameters(self, steps):
         self.optimizer_D.zero_grad()
         self.optimizer_G.zero_grad()
         config = self.configs.sample()
@@ -148,10 +148,10 @@ class ResnetSupernet(BaseResnetDistiller):
 
             if 'cityscapes' in self.opt.dataroot:
                 mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                               table_path=self.opt.table_path,
-                               data_dir=self.opt.cityscapes_path,
-                               batch_size=self.opt.eval_batch_size,
-                               num_workers=self.opt.num_threads)
+                                table_path=self.opt.table_path,
+                                data_dir=self.opt.cityscapes_path,
+                                batch_size=self.opt.eval_batch_size,
+                                num_workers=self.opt.num_threads)
                 if mIoU > getattr(self, 'best_mIoU_%s' % config_name):
                     self.is_best = True
                     setattr(self, 'best_mIoU_%s' % config_name, mIoU)

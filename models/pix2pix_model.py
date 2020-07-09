@@ -6,14 +6,14 @@ import torch
 from torch import nn
 from tqdm import tqdm
 
-import models.modules.loss
 from data import create_eval_dataloader
 from metric import get_fid, get_mIoU
 from metric.inception import InceptionV3
 from metric.mIoU_score import DRNSeg
-from models import networks
-from models.base_model import BaseModel
 from utils import util
+from . import networks
+from .base_model import BaseModel
+from .modules.loss import GANLoss
 
 
 class Pix2PixModel(BaseModel):
@@ -35,9 +35,6 @@ class Pix2PixModel(BaseModel):
                             help='weight for gan loss')
         parser.add_argument('--real_stat_path', type=str, required=True,
                             help='the path to load the groud-truth images information to compute FID.')
-        parser.set_defaults(norm='instance', netG='mobile_resnet_9blocks', batch_size=4,
-                            dataset_mode='aligned', log_dir='logs/train/pix2pix',
-                            pool_size=0, gan_mode='hinge')
         return parser
 
     def __init__(self, opt):
@@ -63,7 +60,7 @@ class Pix2PixModel(BaseModel):
                                       opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
 
         # define loss functions
-        self.criterionGAN = models.modules.loss.GANLoss(opt.gan_mode).to(self.device)
+        self.criterionGAN = GANLoss(opt.gan_mode).to(self.device)
         if opt.recon_loss_type == 'l1':
             self.criterionRecon = torch.nn.L1Loss()
         elif opt.recon_loss_type == 'l2':
@@ -90,6 +87,7 @@ class Pix2PixModel(BaseModel):
             self.drn_model = DRNSeg('drn_d_105', 19, pretrained=False)
             util.load_network(self.drn_model, opt.drn_path, verbose=False)
             if len(opt.gpu_ids) > 0:
+                self.drn_model.to(self.device)
                 self.drn_model = nn.DataParallel(self.drn_model, opt.gpu_ids)
             self.drn_model.eval()
 
@@ -143,7 +141,7 @@ class Pix2PixModel(BaseModel):
         self.loss_G = self.loss_G_gan + self.loss_G_recon
         self.loss_G.backward()
 
-    def optimize_parameters(self):
+    def optimize_parameters(self, steps):
         self.forward()  # compute fake images: G(A)
         # update D
         self.set_requires_grad(self.netD, True)  # enable backprop for D
@@ -194,10 +192,10 @@ class Pix2PixModel(BaseModel):
         ret = {'metric/fid': fid, 'metric/fid-mean': sum(self.fids) / len(self.fids), 'metric/fid-best': self.best_fid}
         if 'cityscapes' in self.opt.dataroot:
             mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                           table_path=self.opt.table_path,
-                           data_dir=self.opt.cityscapes_path,
-                           batch_size=self.opt.eval_batch_size,
-                           num_workers=self.opt.num_threads)
+                            table_path=self.opt.table_path,
+                            data_dir=self.opt.cityscapes_path,
+                            batch_size=self.opt.eval_batch_size,
+                            num_workers=self.opt.num_threads)
             if mIoU > self.best_mIoU:
                 self.is_best = True
                 self.best_mIoU = mIoU

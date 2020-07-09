@@ -1,8 +1,10 @@
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.utils import remove_spectral_norm
+from torch.nn.utils import spectral_norm
 
+from models.modules.spade_architecture.normalization import SPADE
 from models.networks import BaseNetwork
-from .normalization import SPADE
 
 
 class SPADEResnetBlock(nn.Module):
@@ -17,9 +19,14 @@ class SPADEResnetBlock(nn.Module):
         self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=1)
         if self.learned_shortcut:
             self.conv_s = nn.Conv2d(fin, fout, kernel_size=1, bias=False)
+        if 'spectral' in opt.norm_G:
+            self.conv_0 = spectral_norm(self.conv_0)
+            self.conv_1 = spectral_norm(self.conv_1)
+            if self.learned_shortcut:
+                self.conv_s = spectral_norm(self.conv_s)
 
         # define normalization layers
-        spade_config_str = opt.norm_G
+        spade_config_str = opt.norm_G.replace('spectral', '')
         self.norm_0 = SPADE(spade_config_str, fin, opt.semantic_nc)
         self.norm_1 = SPADE(spade_config_str, fmiddle, opt.semantic_nc)
         if self.learned_shortcut:
@@ -47,16 +54,16 @@ class SPADEResnetBlock(nn.Module):
     def actvn(self, x):
         return F.leaky_relu(x, 2e-1)
 
+    def remove_spectral_norm(self):
+        self.conv_0 = remove_spectral_norm(self.conv_0)
+        self.conv_1 = remove_spectral_norm(self.conv_1)
+        if self.learned_shortcut:
+            self.conv_s = remove_spectral_norm(self.conv_s)
+
 
 class SPADEGenerator(BaseNetwork):
     @staticmethod
     def modify_commandline_options(parser, is_train):
-        parser.add_argument('--norm_G', type=str, default='spadesyncbatch3x3',
-                            help='instance normalization or batch normalization')
-        parser.add_argument('--num_upsampling_layers',
-                            choices=('normal', 'more', 'most'), default='more',
-                            help="If 'more', adds upsampling layer between the two middle resnet blocks. "
-                                 "If 'most', also add one more upsampling + resnet layer at the end of the generator")
         return parser
 
     def __init__(self, opt):
@@ -139,3 +146,16 @@ class SPADEGenerator(BaseNetwork):
         x = F.tanh(x)
 
         return x
+
+    def remove_spectral_norm(self):
+        x = self.head_0.remove_spectral_norm()
+        x = self.G_middle_0.remove_spectral_norm()
+        x = self.G_middle_1.remove_spectral_norm()
+
+        x = self.up_0.remove_spectral_norm()
+        x = self.up_1.remove_spectral_norm()
+        x = self.up_2.remove_spectral_norm()
+        x = self.up_3.remove_spectral_norm()
+
+        if self.opt.num_upsampling_layers == 'most':
+            x = self.up_4.remove_spectral_norm()

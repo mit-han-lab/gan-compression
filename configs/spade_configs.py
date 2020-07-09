@@ -59,5 +59,80 @@ class SPADEConfigs:
 
 
 def get_configs(config_name):
-    # TODO
+    if config_name == 'channels-48':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels-48-part1':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [48, 24], [48, 24], [48, 24]])
+    elif config_name == 'channels-48-part2':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [48, 24], [48, 24], [40, 32]])
+    elif config_name == 'channels-48-part3':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [48, 24], [40, 32], [48, 24]])
+    elif config_name == 'channels-48-part4':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [48, 24], [40, 32], [40, 32]])
+    elif config_name == 'channels-48-part5':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [40, 32], [48, 24], [48, 24]])
+    elif config_name == 'channels-48-part6':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [40, 32], [48, 24], [40, 32]])
+    elif config_name == 'channels-48-part7':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [40, 32], [40, 32], [48, 24]])
+    elif config_name == 'channels-48-part8':
+        return SPADEConfigs(n_channels=[[48, 40, 32],
+                                        [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                        [40, 32], [40, 32], [40, 32]])
+    elif config_name == 'channels2-48':
+        return SPADEConfigs(n_channels=[[48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels2-48-part1':
+        return SPADEConfigs(n_channels=[[48],
+                                        [48, 24], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels2-48-part2':
+        return SPADEConfigs(n_channels=[[40],
+                                        [48, 24], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels2-48-part3':
+        return SPADEConfigs(n_channels=[[32],
+                                        [48, 24], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels2-48-part4':
+        return SPADEConfigs(n_channels=[[24],
+                                        [48, 24], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels2-48-part5':
+        return SPADEConfigs(n_channels=[[48],
+                                        [40, 32], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels2-48-part6':
+        return SPADEConfigs(n_channels=[[40],
+                                        [40, 32], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels2-48-part7':
+        return SPADEConfigs(n_channels=[[32],
+                                        [40, 32], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'channels2-48-part8':
+        return SPADEConfigs(n_channels=[[24],
+                                        [40, 32], [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24],
+                                        [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
+    elif config_name == 'debug':
+        return SPADEConfigs(n_channels=[[48],
+                                        [48], [48], [48], [48],
+                                        [48], [48], [48]])
     raise NotImplementedError('Unknown configuration [%s]!!!' % config_name)

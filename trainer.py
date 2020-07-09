@@ -67,7 +67,7 @@ class Trainer:
 
     def start(self):
         opt = self.opt
-        dataset = self.dataloader
+        dataloader = self.dataloader
         model = self.model
         logger = self.logger
 
@@ -76,10 +76,10 @@ class Trainer:
         total_iter = opt.iter_base
         for epoch in range(start_epoch, end_epoch + 1):
             epoch_start_time = time.time()  # timer for entire epoch
-            for i, data_i in enumerate(dataset):
+            for i, data_i in enumerate(dataloader):
                 iter_start_time = time.time()
                 model.set_input(data_i)
-                model.optimize_parameters()
+                model.optimize_parameters(total_iter)
 
                 if total_iter % opt.print_freq == 0:
                     losses = model.get_current_losses()

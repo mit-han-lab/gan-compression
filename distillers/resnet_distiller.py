@@ -20,8 +20,12 @@ class ResnetDistiller(BaseResnetDistiller):
         parser = super(ResnetDistiller, ResnetDistiller).modify_commandline_options(parser, is_train)
         parser.add_argument('--restore_pretrained_G_path', type=str, default=None,
                             help='the path to restore pretrained G')
-        parser.add_argument('--pretrained_netG', type=str, default='mobile_resnet_9blocks')
+        parser.add_argument('--pretrained_netG', type=str, default='mobile_resnet_9blocks',
+                            help='specify pretrained generator architecture',
+                            choices=['resnet_9blocks', 'mobile_resnet_9blocks',
+                                     'super_mobile_resnet_9blocks', 'sub_mobile_resnet_9blocks'])
         parser.add_argument('--pretrained_ngf', type=int, default=64)
+
         parser.set_defaults(norm='instance', dataset_mode='aligned', log_dir='logs/supernet')
         return parser
 
@@ -67,7 +71,7 @@ class ResnetDistiller(BaseResnetDistiller):
         self.loss_G = self.loss_G_gan + self.loss_G_recon + self.loss_G_distill
         self.loss_G.backward()
 
-    def optimize_parameters(self):
+    def optimize_parameters(self, steps):
         self.optimizer_D.zero_grad()
         self.optimizer_G.zero_grad()
         self.forward()
@@ -128,10 +132,10 @@ class ResnetDistiller(BaseResnetDistiller):
         ret = {'metric/fid': fid, 'metric/fid-mean': sum(self.fids) / len(self.fids), 'metric/fid-best': self.best_fid}
         if 'cityscapes' in self.opt.dataroot and self.opt.direction == 'BtoA':
             mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                           table_path=self.opt.table_path,
-                           data_dir=self.opt.cityscapes_path,
-                           batch_size=self.opt.eval_batch_size,
-                           num_workers=self.opt.num_threads)
+                            table_path=self.opt.table_path,
+                            data_dir=self.opt.cityscapes_path,
+                            batch_size=self.opt.eval_batch_size,
+                            num_workers=self.opt.num_threads)
             if mIoU > self.best_mIoU:
                 self.is_best = True
                 self.best_mIoU = mIoU

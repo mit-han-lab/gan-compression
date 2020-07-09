@@ -23,7 +23,8 @@ class TestOptions(BaseOptions):
                                      'mobile_resnet_9blocks',
                                      'super_mobile_resnet_9blocks',
                                      'sub_mobile_resnet_9blocks',
-                                     'spade', 'sub_mobile_spade'],
+                                     'spade', 'mobile_spade',
+                                     'sub_mobile_spade'],
                             help='specify generator architecture')
         parser.add_argument('--ngf', type=int, default=64, help='the base number of filters of the student generator')
         parser.add_argument('--dropout_rate', type=float, default=0, help='the dropout rate of the generator')

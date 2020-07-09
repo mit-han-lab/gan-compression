@@ -4,6 +4,7 @@ import os
 import numpy as np
 import torch
 from torch import nn
+from torch.nn import DataParallel
 
 import models.modules.loss
 from data import create_eval_dataloader
@@ -21,11 +22,13 @@ class BaseResnetDistiller(BaseModel):
         assert is_train
         parser = super(BaseResnetDistiller, BaseResnetDistiller).modify_commandline_options(parser, is_train)
         parser.add_argument('--teacher_netG', type=str, default='mobile_resnet_9blocks',
-                            help='specify teacher generator architecture '
-                                 '[resnet_9blocks | mobile_resnet_9blocks | super_mobile_resnet_9blocks]')
+                            help='specify teacher generator architecture',
+                            choices=['resnet_9blocks', 'mobile_resnet_9blocks',
+                                     'super_mobile_resnet_9blocks', 'sub_mobile_resnet_9blocks'])
         parser.add_argument('--student_netG', type=str, default='mobile_resnet_9blocks',
-                            help='specify student generator architecture '
-                                 '[resnet_9blocks | mobile_resnet_9blocks | super_mobile_resnet_9blocks]')
+                            help='specify student generator architecture',
+                            choices=['resnet_9blocks', 'mobile_resnet_9blocks',
+                                     'super_mobile_resnet_9blocks', 'sub_mobile_resnet_9blocks'])
         parser.add_argument('--teacher_ngf', type=int, default=64,
                             help='the base number of filters of the teacher generator')
         parser.add_argument('--student_ngf', type=int, default=48,
@@ -51,9 +54,6 @@ class BaseResnetDistiller(BaseModel):
                             help='weight for gan loss')
         parser.add_argument('--teacher_dropout_rate', type=float, default=0)
         parser.add_argument('--student_dropout_rate', type=float, default=0)
-        parser.add_argument('--gan_mode', type=str, default='hinge', choices=['lsgan', 'vanilla', 'hinge'],
-                            help='the type of GAN objective. [vanilla| lsgan | hinge]. '
-                                 'vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
         return parser
 
     def __init__(self, opt):
@@ -70,6 +70,7 @@ class BaseResnetDistiller(BaseModel):
         self.netG_student = networks.define_G(opt.input_nc, opt.output_nc, opt.student_ngf,
                                               opt.student_netG, opt.norm, opt.student_dropout_rate,
                                               opt.init_type, opt.init_gain, self.gpu_ids, opt=opt)
+
         if hasattr(opt, 'distiller'):
             self.netG_pretrained = networks.define_G(opt.input_nc, opt.output_nc, opt.pretrained_ngf,
                                                      opt.pretrained_netG, opt.norm, 0,
@@ -132,6 +133,7 @@ class BaseResnetDistiller(BaseModel):
             self.drn_model = DRNSeg('drn_d_105', 19, pretrained=False)
             util.load_network(self.drn_model, opt.drn_path, verbose=False)
             if len(opt.gpu_ids) > 0:
+                self.drn_model.to(self.device)
                 self.drn_model = nn.DataParallel(self.drn_model, opt.gpu_ids)
             self.drn_model.eval()
 
@@ -194,7 +196,7 @@ class BaseResnetDistiller(BaseModel):
     def backward_G(self):
         raise NotImplementedError
 
-    def optimize_parameters(self):
+    def optimize_parameters(self, steps):
         raise NotImplementedError
 
     def print_networks(self):
@@ -230,32 +232,31 @@ class BaseResnetDistiller(BaseModel):
                     param_group['lr'] = self.opt.lr
 
     def save_networks(self, epoch):
+
+        def save_net(net, save_path):
+            if len(self.gpu_ids) > 0 and torch.cuda.is_available():
+                if isinstance(net, DataParallel):
+                    torch.save(net.module.cpu().state_dict(), save_path)
+                else:
+                    torch.save(net.cpu().state_dict(), save_path)
+                net.cuda(self.gpu_ids[0])
+            else:
+                torch.save(net.cpu().state_dict(), save_path)
+
         save_filename = '%s_net_%s.pth' % (epoch, 'G')
         save_path = os.path.join(self.save_dir, save_filename)
         net = getattr(self, 'net%s_student' % 'G')
-        if len(self.gpu_ids) > 0 and torch.cuda.is_available():
-            torch.save(net.module.cpu().state_dict(), save_path)
-            net.cuda(self.gpu_ids[0])
-        else:
-            torch.save(net.cpu().state_dict(), save_path)
+        save_net(net, save_path)
 
         save_filename = '%s_net_%s.pth' % (epoch, 'D')
         save_path = os.path.join(self.save_dir, save_filename)
         net = getattr(self, 'net%s' % 'D')
-        if len(self.gpu_ids) > 0 and torch.cuda.is_available():
-            torch.save(net.module.cpu().state_dict(), save_path)
-            net.cuda(self.gpu_ids[0])
-        else:
-            torch.save(net.cpu().state_dict(), save_path)
+        save_net(net, save_path)
 
         for i, net in enumerate(self.netAs):
             save_filename = '%s_net_%s-%d.pth' % (epoch, 'A', i)
             save_path = os.path.join(self.save_dir, save_filename)
-            if len(self.gpu_ids) > 0 and torch.cuda.is_available():
-                torch.save(net.cpu().state_dict(), save_path)
-                net.cuda(self.gpu_ids[0])
-            else:
-                torch.save(net.cpu().state_dict(), save_path)
+            save_net(net, save_path)
 
         for i, optimizer in enumerate(self.optimizers):
             save_filename = '%s_optim-%d.pth' % (epoch, i)

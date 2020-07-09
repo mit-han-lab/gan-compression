@@ -12,6 +12,7 @@ import torch.nn.utils.spectral_norm as spectral_norm
 from models.modules.mobile_modules import SeparableConv2d
 from models.modules.super_modules import SuperConv2d, SuperSeparableConv2d, SuperSynchronizedBatchNorm2d
 from models.modules.sync_batchnorm import SynchronizedBatchNorm2d
+from models.networks import get_norm_layer
 
 
 # Returns a function that creates a normalization function
@@ -67,7 +68,7 @@ def get_nonspade_norm_layer(opt, norm_type='instance'):
 # |norm_nc|: the #channels of the normalized activations, hence the output dim of SPADE
 # |label_nc|: the #channels of the input semantic map, hence the input dim of SPADE
 class MobileSPADE(nn.Module):
-    def __init__(self, config_text, norm_nc, label_nc, nhidden=128):
+    def __init__(self, config_text, norm_nc, label_nc, nhidden=128, separable_conv_norm='none'):
         super(MobileSPADE, self).__init__()
 
         assert config_text.startswith('spade')
@@ -92,8 +93,11 @@ class MobileSPADE(nn.Module):
             nn.Conv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
             nn.ReLU()
         )
-        self.mlp_gamma = SeparableConv2d(nhidden, norm_nc, kernel_size=ks, padding=pw)
-        self.mlp_beta = SeparableConv2d(nhidden, norm_nc, kernel_size=ks, padding=pw)
+        norm_layer = get_norm_layer(separable_conv_norm)
+        self.mlp_gamma = SeparableConv2d(nhidden, norm_nc, kernel_size=ks,
+                                         padding=pw, norm_layer=norm_layer)
+        self.mlp_beta = SeparableConv2d(nhidden, norm_nc, kernel_size=ks,
+                                        padding=pw, norm_layer=norm_layer)
 
     def forward(self, x, segmap):
 
