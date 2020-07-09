@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 python latency.py --dataroot database/cityscapes-origin \
-  --config_str 32_32_48_32_32_32_32_24 \
+  --config_str 32_40_40_32_40_24_32_24 \
   --model spade --dataset_mode cityscapes \
   --results_dir results-pretrained/gaugan/cityscapes/compressed \
   --ngf 48 --netG sub_mobile_spade \
