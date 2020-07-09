@@ -96,6 +96,9 @@ if __name__ == '__main__':
                         help='# of output image channels: 3 for RGB and 1 for grayscale')
     parser.add_argument('--no_instance', action='store_true',
                         help='if specified, do *not* add instance map as input')
+    parser.add_argument('--separable_conv_norm', type=str, default='instance',
+                        choices=('none', 'instance', 'batch'),
+                        help='whether to use instance norm for the separable convolutions')
     parser.add_argument('--contain_dontcare_label', action='store_true',
                         help='if the label map contains dontcare label (dontcare=255)')
     parser.add_argument('--crop_size', type=int, default=512,
