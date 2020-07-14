@@ -98,7 +98,10 @@ class BaseResnetDistiller(BaseModel):
         else:
             raise NotImplementedError('Unknown reconstruction loss type [%s]!' % opt.loss_type)
 
-        self.mapping_layers = ['module.model.%d' % i for i in range(9, 21, 3)]
+        if isinstance(self.netG_teacher, nn.DataParallel):
+            self.mapping_layers = ['module.model.%d' % i for i in range(9, 21, 3)]
+        else:
+            self.mapping_layers = ['model.%d' % i for i in range(9, 21, 3)]
 
         self.netAs = []
         self.Tacts, self.Sacts = {}, {}
