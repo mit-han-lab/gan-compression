@@ -29,6 +29,10 @@ class SearchOptions(BaseOptions):
         parser.add_argument('--budget', type=float, default=1e18, help='the MAC budget')
         parser.add_argument('--real_stat_path', type=str, required=True,
                             help='the path to load the ground-truth images information to compute FID.')
+        parser.add_argument('--split', type=int, default=1,
+                            help='the number of parts you would like to split searching space into')
+        parser.add_argument('--remainder', type=int, default=0,
+                            help='the specific part your are evaluating')
 
         # rewrite devalue values
         parser.set_defaults(phase='val', serial_batches=True, no_flip=True,

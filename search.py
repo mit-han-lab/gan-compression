@@ -56,7 +56,7 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError
     configs = get_configs(config_name=opt.config_set)
-    configs = list(configs.all_configs())
+    configs = list(configs.all_configs(split=opt.split, remainder=opt.remainder))
 
     dataloader = create_dataloader(opt)
     model = create_model(opt)

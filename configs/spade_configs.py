@@ -29,7 +29,7 @@ class SPADEConfigs:
             ret['channels'].append(min(n_channel))
         return ret
 
-    def all_configs(self):
+    def all_configs(self, split=1, remainder=0):
 
         def yield_channels(i):
             if i == len(self.n_channels):
@@ -39,8 +39,9 @@ class SPADEConfigs:
                 for after_channels in yield_channels(i + 1):
                     yield [n] + after_channels
 
-        for channels in yield_channels(0):
-            yield {'channels': channels}
+        for i, channels in enumerate(yield_channels(0)):
+            if i % split == remainder:
+                yield {'channels': channels}
 
     def __call__(self, name):
         assert name in ('largest', 'smallest')
