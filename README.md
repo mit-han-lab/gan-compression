@@ -1,6 +1,8 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [demo](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex)
 
+**[NEW!]** The simplified pipeline of GAN Compression is released! Check the [tutorial](docs/simplified_pipeline.md) for the pipeline.
+
 **[NEW!]** GauGAN training code and tutorial is released! Check the [tutorial](docs/training_tutorial.md) to compress GauGAN.
 
 **[NEW!]** Correct metric naming and update the evaluation protocol. Support MACs budget for searching.
@@ -8,8 +10,6 @@
 **[NEW!]** The compressed model and test codes of GauGAN are released! Check [here](#gaugan) to use our models.
 
 **[NEW!]** The [tutorial](docs/training_tutorial.md) of compression is released! Check the [overview](docs/overview.md) for better understanding our codebase.
-
-**[NEW!]** The PyTorch implementation of a general conditional GAN Compression framework is released.  
 
 ![teaser](imgs/teaser.png)*We introduce GAN Compression, a general-purpose method for compressing conditional GANs. Our method reduces the computation of widely-used conditional GAN models, including pix2pix, CycleGAN, and GauGAN, by 9-21x while preserving the visual fidelity. Our method is effective for a wide range of generator architectures, learning objectives, and both paired and unpaired settings.*
 
@@ -189,7 +189,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 
 ### <span id="cityscapes">Cityscapes Dataset</span>
 
-For the Cityscapes dataset, we cannot provide it due to license issue. Please download the dataset from https://cityscapes-dataset.com and use the script `datasets/prepare_cityscapes_dataset.py` to preprocess it. You need to download `gtFine_trainvaltest.zip` and `leftImg8bit_trainvaltest.zip` and unzip them in the same folder. For example, you may put `gtFine` and `leftImg8bit` in `database/cityscapes-origin`. You need to prepare the dataset with the following commands:
+For the Cityscapes dataset, we cannot provide it due to license issue. Please download the dataset from https://cityscapes-dataset.com and use the script [prepare_cityscapes_dataset.py](datasets/prepare_cityscapes_dataset.py) to preprocess it. You need to download `gtFine_trainvaltest.zip` and `leftImg8bit_trainvaltest.zip` and unzip them in the same folder. For example, you may put `gtFine` and `leftImg8bit` in `database/cityscapes-origin`. You need to prepare the dataset with the following commands:
 
 ```shell
 python datasets/get_trainIds.py database/cityscapes-origin/gtFine/
@@ -210,7 +210,7 @@ Please refer to our training [tutorial](docs/training_tutorial.md) on how to tra
 
 ### FID Computation
 
-To compute the FID score, you need to get some statistical information from the groud-truth images of your dataset. We provide a script `get_real_stat.py` to extract statistical information. For example, for the edges2shoes dataset, you could run the following command:
+To compute the FID score, you need to get some statistical information from the groud-truth images of your dataset. We provide a script [get_real_stat.py](./get_real_stat.py) to extract statistical information. For example, for the edges2shoes dataset, you could run the following command:
 
   ```shell
 python get_real_stat.py \

@@ -3,12 +3,14 @@ from torch import nn
 from models.modules.mobile_modules import SeparableConv2d
 from models.modules.resnet_architecture.mobile_resnet_generator import MobileResnetBlock
 from models.modules.resnet_architecture.resnet_generator import ResnetBlock
+from models.modules.resnet_architecture.super_mobile_resnet_generator import SuperMobileResnetBlock
 from models.modules.spade_architecture.mobile_spade_generator import MobileSPADEGenerator, MobileSPADEResnetBlock, \
     MobileSPADE
+from models.modules.super_modules import SuperConv2d, SuperConvTranspose2d, SuperSeparableConv2d
 
 
 def transfer_Conv2d(m1, m2, input_index=None, output_index=None):
-    assert isinstance(m1, nn.Conv2d) and isinstance(m2, nn.Conv2d)
+    assert isinstance(m1, nn.Conv2d) and isinstance(m2, (nn.Conv2d, SuperConv2d))
     if m1.out_channels == 3:  # If this is the last convolution
         assert input_index is not None
         m2.weight.data = m1.weight.data[:, input_index].clone()
@@ -42,7 +44,7 @@ def transfer_Conv2d(m1, m2, input_index=None, output_index=None):
 
 
 def transfer_ConvTranspose2d(m1, m2, input_index=None, output_index=None):
-    assert isinstance(m1, nn.ConvTranspose2d) and isinstance(m2, nn.ConvTranspose2d)
+    assert isinstance(m1, nn.ConvTranspose2d) and isinstance(m2, (nn.ConvTranspose2d, SuperConvTranspose2d))
     assert output_index is None
     p = m1.weight.data
     if input_index is None:
@@ -60,7 +62,7 @@ def transfer_ConvTranspose2d(m1, m2, input_index=None, output_index=None):
 
 
 def transfer_SeparableConv2d(m1, m2, input_index=None, output_index=None):
-    assert isinstance(m1, SeparableConv2d) and isinstance(m2, SeparableConv2d)
+    assert isinstance(m1, SeparableConv2d) and isinstance(m2, (SeparableConv2d, SuperSeparableConv2d))
     dw1, pw1 = m1.conv[0], m1.conv[2]
     dw2, pw2 = m2.conv[0], m2.conv[2]
 
@@ -77,7 +79,7 @@ def transfer_SeparableConv2d(m1, m2, input_index=None, output_index=None):
 
 
 def transfer_MobileResnetBlock(m1, m2, input_index=None, output_index=None):
-    assert isinstance(m1, MobileResnetBlock) and isinstance(m2, MobileResnetBlock)
+    assert isinstance(m1, MobileResnetBlock) and isinstance(m2, (MobileResnetBlock, SuperMobileResnetBlock))
     assert output_index is None
     idxs = transfer(m1.conv_block[1], m2.conv_block[1], input_index=input_index)
     idxs = transfer(m1.conv_block[6], m2.conv_block[6], input_index=idxs, output_index=input_index)
@@ -125,7 +127,6 @@ def transfer_MobileSPADEResnetBlock(m1, m2, input_index=None, output_index=None)
 
 
 def transfer(m1, m2, input_index=None, output_index=None):
-    assert type(m1) == type(m2)
     if isinstance(m1, nn.Conv2d):
         return transfer_Conv2d(m1, m2, input_index, output_index)
     elif isinstance(m1, nn.ConvTranspose2d):
@@ -145,7 +146,6 @@ def transfer(m1, m2, input_index=None, output_index=None):
 
 
 def load_pretrained_weight(model1, model2, netA, netB, ngf1, ngf2):
-    assert model1 == model2
     assert ngf1 >= ngf2
 
     if isinstance(netA, nn.DataParallel):
@@ -162,7 +162,7 @@ def load_pretrained_weight(model1, model2, netA, netB, ngf1, ngf2):
         assert len(net1.model) == len(net2.model)
         for i in range(28):
             m1, m2 = net1.model[i], net2.model[i]
-            assert type(m1) == type(m2)
+            # assert type(m1) == type(m2)
             if isinstance(m1, (nn.Conv2d, nn.ConvTranspose2d, MobileResnetBlock)):
                 index = transfer(m1, m2, index)
     elif model1 == 'resnet_9blocks':

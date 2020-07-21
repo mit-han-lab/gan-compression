@@ -71,6 +71,11 @@ class BaseResnetDistiller(BaseModel):
                                               opt.student_netG, opt.norm, opt.student_dropout_rate,
                                               opt.init_type, opt.init_gain, self.gpu_ids, opt=opt)
 
+        if getattr(opt, 'sort_channels', False) and opt.restore_student_G_path is not None:
+            self.netG_student_tmp = networks.define_G(opt.input_nc, opt.output_nc, opt.student_ngf,
+                                                      opt.student_netG.replace('super_', ''), opt.norm,
+                                                      opt.student_dropout_rate, opt.init_type, opt.init_gain,
+                                                      self.gpu_ids, opt=opt)
         if hasattr(opt, 'distiller'):
             self.netG_pretrained = networks.define_G(opt.input_nc, opt.output_nc, opt.pretrained_ngf,
                                                      opt.pretrained_netG, opt.norm, 0,
@@ -221,6 +226,8 @@ class BaseResnetDistiller(BaseModel):
         util.load_network(self.netG_teacher, self.opt.restore_teacher_G_path, verbose)
         if self.opt.restore_student_G_path is not None:
             util.load_network(self.netG_student, self.opt.restore_student_G_path, verbose)
+            if hasattr(self, 'netG_student_tmp'):
+                util.load_network(self.netG_student_tmp, self.opt.restore_student_G_path, verbose)
         if self.opt.restore_D_path is not None:
             util.load_network(self.netD, self.opt.restore_D_path, verbose)
         if self.opt.restore_A_path is not None:

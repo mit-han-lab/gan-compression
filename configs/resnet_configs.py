@@ -71,6 +71,22 @@ def get_configs(config_name):
         return ResnetConfigs(n_channels=[[32, 24, 16], [32, 24, 16], [32, 24, 16],
                                          [32, 24, 16], [32, 24, 16], [32, 24, 16],
                                          [32, 24, 16], [32, 24, 16]])
+    elif config_name == 'channels-64-cycleGAN-stage1':
+        return ResnetConfigs(n_channels=[[64, 48, 32], [64, 48, 32], [64, 48, 32],
+                                         [64, 48, 32], [64, 48, 32], [64, 48, 32],
+                                         [64, 48, 32], [64, 48, 32]])
+    elif config_name == 'channels-64-cycleGAN':
+        return ResnetConfigs(n_channels=[[64, 48, 32, 24, 16], [64, 48, 32, 24, 16], [64, 48, 32, 24, 16],
+                                         [64, 48, 32, 24, 16], [64, 48, 32, 24, 16], [64, 48, 32, 24, 16],
+                                         [64, 48, 32, 24, 16], [64, 48, 32, 24, 16]])
+    elif config_name == 'channels-64-pix2pix-stage1':
+        return ResnetConfigs(n_channels=[[64, 48], [64, 48], [64, 48],
+                                         [64, 48], [64, 48], [64, 48],
+                                         [64, 48, 32], [64, 48, 32]])
+    elif config_name == 'channels-64-pix2pix':
+        return ResnetConfigs(n_channels=[[64, 48, 32], [64, 48, 32], [64, 48, 40, 32],
+                                         [64, 48, 40, 32], [64, 48, 40, 32], [64, 48, 40, 32],
+                                         [64, 48, 32, 24, 16], [64, 48, 32, 24, 16]])
     elif config_name == 'debug':
         return ResnetConfigs(n_channels=[[48, 32], [48, 32], [48, 40, 32],
                                          [48, 40, 32], [48, 40, 32], [48, 40, 32],

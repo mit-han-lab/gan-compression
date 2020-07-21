@@ -2,8 +2,8 @@ import ntpath
 import os
 
 import torch
-import torch.nn.functional as F
 from torch import nn
+from torch.nn import functional as F
 from tqdm import tqdm
 
 from configs import decode_config
@@ -13,6 +13,7 @@ from distillers.base_resnet_distiller import BaseResnetDistiller
 from metric import get_fid, get_mIoU
 from models.modules.super_modules import SuperConv2d
 from utils import util
+from utils.weight_transfer import load_pretrained_weight
 
 
 class ResnetSupernet(BaseResnetDistiller):
@@ -20,6 +21,8 @@ class ResnetSupernet(BaseResnetDistiller):
     def modify_commandline_options(parser, is_train):
         assert is_train
         parser = super(ResnetSupernet, ResnetSupernet).modify_commandline_options(parser, is_train)
+        parser.add_argument('--sort_channels', action='store_true',
+                            help='whether to sort the channels of student G by L1 norm')
         parser.set_defaults(norm='instance', student_netG='super_mobile_resnet_9blocks',
                             dataset_mode='aligned', log_dir='logs/supernet')
         return parser
@@ -170,3 +173,11 @@ class ResnetSupernet(BaseResnetDistiller):
     def test(self, config):
         with torch.no_grad():
             self.forward(config)
+
+    def load_networks(self, verbose=True):
+        super(ResnetSupernet, self).load_networks()
+        if hasattr(self, 'netG_student_tmp'):
+            load_pretrained_weight(self.opt.student_netG.replace('super_', ''), self.opt.student_netG,
+                                   self.netG_student_tmp, self.netG_student,
+                                   self.opt.student_ngf, self.opt.student_ngf)
+            del self.netG_student_tmp
