@@ -1,4 +1,4 @@
-# Training Tutorial
+# GAN Compression Lite Training Tutorial
 ## Prerequisites
 
 * Linux
@@ -13,7 +13,7 @@ Please refer to our [README](../README.md) for the installation, dataset prepara
 
 ### Pipeline
 
-Below we show a simplified pipeline for compressing pix2pix and cycleGAN models. **We provide pre-trained models after each step. You could use the pretrained models to skip some steps.** For more training details, please refer to our codes.
+Below we show a lite pipeline for compressing pix2pix and cycleGAN models. **We provide pre-trained models after each step. You could use the pretrained models to skip some steps.** For more training details, please refer to our codes.
 
 ## Pix2pix Model Compression
 

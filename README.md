@@ -1,7 +1,7 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [demo](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex)
 
-**[NEW!]** The simplified pipeline of GAN Compression is released! Check the [tutorial](docs/simplified_pipeline.md) for the pipeline.
+**[NEW!]** The lite pipeline (GAN Compression Lite) is released! Check the [tutorial](docs/lite_pipeline.md) for the pipeline.
 
 **[NEW!]** GauGAN training code and tutorial is released! Check the [tutorial](docs/training_tutorial.md) to compress GauGAN.
 
@@ -52,12 +52,6 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 
   - For pip users, please type the command `pip install -r requirements.txt`.
   - For Conda users, we provide an installation script `scripts/conda_deps.sh`. Alternatively, you can create a new Conda environment using `conda env create -f environment.yml`.
-
-- Install [torchprofile](https://github.com/mit-han-lab/torchprofile).
-
-  ```shell
-  pip install --upgrade git+https://github.com/mit-han-lab/torchprofile.git
-  ```
 
 ### CycleGAN
 
