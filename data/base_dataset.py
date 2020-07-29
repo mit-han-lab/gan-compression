@@ -65,14 +65,15 @@ def get_params(opt, size):
     w, h = size
     new_h = h
     new_w = w
+    crop_w, crop_h = 0, 0
     if opt.preprocess == 'resize_and_crop':
         new_h = new_w = opt.load_size
+        crop_h = crop_w = opt.crop_size
     elif opt.preprocess == 'scale_width_and_crop':
         new_w = opt.load_size
         new_h = opt.load_size * h // w
-
-    crop_w = opt.crop_size
-    crop_h = opt.crop_size * h // w
+        crop_w = opt.crop_size
+        crop_h = opt.crop_size * h // w
 
     x = random.randint(0, np.maximum(0, new_w - crop_w))
     y = random.randint(0, np.maximum(0, new_h - crop_h))

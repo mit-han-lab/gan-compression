@@ -2,7 +2,7 @@
 python train_supernet.py --dataroot database/cityscapes-origin \
   --supernet spade \
   --log_dir logs/gaugan/cityscapes/supernet \
-  --restore_teacher_G_path logs/gaugan/cityscapes/mobile/export/latest_net_G.pth \
+  --restore_teacher_G_path logs/gaugan/cityscapes/mobile/checkpoint/latest_net_G.pth \
   --restore_student_G_path logs/gaugan/cityscapes/distill/checkpoints/latest_net_G.pth \
   --restore_D_path logs/gaugan/cityscapes/distill/checkpoints/latest_net_D.pth \
   --real_stat_path real_stat/cityscapes_A.npz \
