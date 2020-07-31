@@ -123,7 +123,7 @@ To accelerate the search process, you may need to want to search the sub-network
 Then you could merge the search results with [merge.py](../merge.py)
 
 ```bash
-python merge.py --in_dir logs/pix2pix/edges2shoes-r_lite/supernet-stage2/pkls \
+python merge.py --input_dir logs/pix2pix/edges2shoes-r_lite/supernet-stage2/pkls \
   --output_path logs/cycle_gan/horse2zebra/supernet
 ```
 
