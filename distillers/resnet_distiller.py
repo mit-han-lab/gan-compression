@@ -5,9 +5,10 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.nn.parallel import gather, parallel_apply, replicate
 from tqdm import tqdm
 
-from metric import get_fid, get_mIoU
+from metric import get_fid, get_cityscapes_mIoU
 from utils import util
 from utils.weight_transfer import load_pretrained_weight
 from .base_resnet_distiller import BaseResnetDistiller
@@ -47,10 +48,12 @@ class ResnetDistiller(BaseResnetDistiller):
         for i, netA in enumerate(self.netAs):
             assert isinstance(netA, nn.Conv2d)
             n = self.mapping_layers[i]
-            Tact = self.Tacts[n]
-            Sact = self.Sacts[n]
-            Sact = netA(Sact)
-            loss = F.mse_loss(Sact, Tact)
+            netA_replicas = replicate(netA, self.gpu_ids)
+            Sacts = parallel_apply(netA_replicas,
+                                   tuple([self.Sacts[key] for key in sorted(self.Sacts.keys()) if n in key]))
+            Tacts = [self.Tacts[key] for key in sorted(self.Tacts.keys()) if n in key]
+            loss = [F.mse_loss(Sact, Tact) for Sact, Tact in zip(Sacts, Tacts)]
+            loss = gather(loss, self.gpu_ids[0]).sum()
             setattr(self, 'loss_G_distill%d' % i, loss)
             losses.append(loss)
         return sum(losses)
@@ -131,11 +134,11 @@ class ResnetDistiller(BaseResnetDistiller):
             self.fids.pop(0)
         ret = {'metric/fid': fid, 'metric/fid-mean': sum(self.fids) / len(self.fids), 'metric/fid-best': self.best_fid}
         if 'cityscapes' in self.opt.dataroot and self.opt.direction == 'BtoA':
-            mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                            table_path=self.opt.table_path,
-                            data_dir=self.opt.cityscapes_path,
-                            batch_size=self.opt.eval_batch_size,
-                            num_workers=self.opt.num_threads)
+            mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
+                                       table_path=self.opt.table_path,
+                                       data_dir=self.opt.cityscapes_path,
+                                       batch_size=self.opt.eval_batch_size,
+                                       num_workers=self.opt.num_threads)
             if mIoU > self.best_mIoU:
                 self.is_best = True
                 self.best_mIoU = mIoU

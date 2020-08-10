@@ -4,13 +4,14 @@ import os
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.parallel import gather, parallel_apply, replicate
 from tqdm import tqdm
 
 from configs import decode_config
 from configs.resnet_configs import get_configs
 from configs.single_configs import SingleConfigs
 from distillers.base_resnet_distiller import BaseResnetDistiller
-from metric import get_fid, get_mIoU
+from metric import get_fid, get_cityscapes_mIoU
 from models.modules.super_modules import SuperConv2d
 from utils import util
 from utils.weight_transfer import load_pretrained_weight
@@ -60,10 +61,13 @@ class ResnetSupernet(BaseResnetDistiller):
         for i, netA in enumerate(self.netAs):
             assert isinstance(netA, SuperConv2d)
             n = self.mapping_layers[i]
-            Tact = self.Tacts[n]
-            Sact = self.Sacts[n]
-            Sact = netA(Sact, {'channel': netA.out_channels})
-            loss = F.mse_loss(Sact, Tact)
+            netA_replicas = replicate(netA, self.gpu_ids)
+            kwargs = tuple([{'config': {'channel': netA.out_channels}} for idx in self.gpu_ids])
+            Sacts = parallel_apply(netA_replicas,
+                                   tuple([self.Sacts[key] for key in sorted(self.Sacts.keys()) if n in key]), kwargs)
+            Tacts = [self.Tacts[key] for key in sorted(self.Tacts.keys()) if n in key]
+            loss = [F.mse_loss(Sact, Tact) for Sact, Tact in zip(Sacts, Tacts)]
+            loss = gather(loss, self.gpu_ids[0]).sum()
             setattr(self, 'loss_G_distill%d' % i, loss)
             losses.append(loss)
         return sum(losses)
@@ -150,11 +154,11 @@ class ResnetSupernet(BaseResnetDistiller):
             ret['metric/fid_%s-best' % config_name] = getattr(self, 'best_fid_%s' % config_name)
 
             if 'cityscapes' in self.opt.dataroot:
-                mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                                table_path=self.opt.table_path,
-                                data_dir=self.opt.cityscapes_path,
-                                batch_size=self.opt.eval_batch_size,
-                                num_workers=self.opt.num_threads)
+                mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
+                                           table_path=self.opt.table_path,
+                                           data_dir=self.opt.cityscapes_path,
+                                           batch_size=self.opt.eval_batch_size,
+                                           num_workers=self.opt.num_threads)
                 if mIoU > getattr(self, 'best_mIoU_%s' % config_name):
                     self.is_best = True
                     setattr(self, 'best_mIoU_%s' % config_name, mIoU)

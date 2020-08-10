@@ -8,8 +8,8 @@ from torch.nn import DataParallel
 
 import models.modules.loss
 from data import create_eval_dataloader
+from metric.cityscapes_mIoU import DRNSeg
 from metric.inception import InceptionV3
-from metric.mIoU_score import DRNSeg
 from models import networks
 from models.base_model import BaseModel
 from models.modules.super_modules import SuperConv2d
@@ -156,7 +156,7 @@ class BaseResnetDistiller(BaseModel):
         if self.opt.lambda_distill > 0:
             def get_activation(mem, name):
                 def get_output_hook(module, input, output):
-                    mem[name] = output
+                    mem[name + str(output.device)] = output
 
                 return get_output_hook
 
