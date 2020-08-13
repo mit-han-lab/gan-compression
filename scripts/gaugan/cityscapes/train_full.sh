@@ -11,6 +11,6 @@ python train.py --dataroot database/cityscapes-origin \
   --norm_G spectralspadesyncbatch3x3
 
 # remove the spectral normalization for the distillation and once-for-all network training
-python remove_spectral_norm.py \
+python remove_spectral_norm.py --netG spade \
   --restore_G_path logs/gaugan/cityscapes/full/checkpoints/latest_net_G.pth \
   --output_path logs/gaugan/cityscapes/full/export/latest_net_G.pth
