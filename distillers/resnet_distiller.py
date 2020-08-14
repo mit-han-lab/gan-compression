@@ -8,7 +8,7 @@ from torch import nn
 from torch.nn.parallel import gather, parallel_apply, replicate
 from tqdm import tqdm
 
-from metric import get_fid, get_cityscapes_mIoU
+from metric import get_fid, get_mIoU
 from utils import util
 from utils.weight_transfer import load_pretrained_weight
 from .base_resnet_distiller import BaseResnetDistiller
@@ -134,11 +134,11 @@ class ResnetDistiller(BaseResnetDistiller):
             self.fids.pop(0)
         ret = {'metric/fid': fid, 'metric/fid-mean': sum(self.fids) / len(self.fids), 'metric/fid-best': self.best_fid}
         if 'cityscapes' in self.opt.dataroot and self.opt.direction == 'BtoA':
-            mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
-                                       table_path=self.opt.table_path,
-                                       data_dir=self.opt.cityscapes_path,
-                                       batch_size=self.opt.eval_batch_size,
-                                       num_workers=self.opt.num_threads)
+            mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
+                            table_path=self.opt.table_path,
+                            data_dir=self.opt.cityscapes_path,
+                            batch_size=self.opt.eval_batch_size,
+                            num_workers=self.opt.num_threads)
             if mIoU > self.best_mIoU:
                 self.is_best = True
                 self.best_mIoU = mIoU
