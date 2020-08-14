@@ -1,6 +1,6 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [demo](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex)
-**[NEW!]** The [lite pipeline](docs/lite_pipeline.md) (GAN Compression Lite) is updated! The lite version of [map2sat](scripts/pix2pix/map2sat_lite) is released!
+**[NEW!]** The [lite pipeline](docs/lite_pipeline.md) (GAN Compression Lite) is updated, which could produce comparable results as the full pipeline! The lite version of [map2sat](scripts/pix2pix/map2sat_lite) is released!
 
 **[NEW!]** The lite pipeline (GAN Compression Lite) is released! Check the [tutorial](docs/lite_pipeline.md) for the pipeline.
 
