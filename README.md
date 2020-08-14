@@ -1,5 +1,6 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [demo](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex)
+**[NEW!]** The [lite pipeline](docs/lite_pipeline.md) (GAN Compression Lite) is updated! The lite version of [map2sat](scripts/pix2pix/map2sat_lite) is released!
 
 **[NEW!]** The lite pipeline (GAN Compression Lite) is released! Check the [tutorial](docs/lite_pipeline.md) for the pipeline.
 
@@ -8,8 +9,6 @@
 **[NEW!]** Correct metric naming and update the evaluation protocol. Support MACs budget for searching.
 
 **[NEW!]** The compressed model and test codes of GauGAN are released! Check [here](#gaugan) to use our models.
-
-**[NEW!]** The [tutorial](docs/training_tutorial.md) of compression is released! Check the [overview](docs/overview.md) for better understanding our codebase.
 
 ![teaser](imgs/teaser.png)*We introduce GAN Compression, a general-purpose method for compressing conditional GANs. Our method reduces the computation of widely-used conditional GAN models, including pix2pix, CycleGAN, and GauGAN, by 9-21x while preserving the visual fidelity. Our method is effective for a wide range of generator architectures, learning objectives, and both paired and unpaired settings.*
 
