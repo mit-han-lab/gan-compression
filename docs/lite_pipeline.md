@@ -17,28 +17,28 @@ Below we show a lite pipeline for compressing pix2pix and cycleGAN models. **We 
 
 ## Pix2pix Model Compression
 
-We will show the whole pipeline on `edges2shoes-r` dataset. You could change the dataset name to other datasets (`map2sat` and `cityscapes`).
+We will show the whole pipeline on `edges2shoes-r` dataset. You could change the dataset name to other datasets (such as `map2sat`).
 
-##### Train a MobileNet Teacher Model (The same as the full pipeline)
+##### Train an Original Full Teacher Model (if you already have the full model, you could skip it)
 
-Train a MobileNet-style teacher model from scratch.
+Train an original full teacher model from scratch.
 ```shell
-bash scripts/pix2pix/edges2shoes-r_lite/train_mobile.sh
+bash scripts/pix2pix/edges2shoes-r/train_full.sh
 ```
 We provide a pre-trained teacher for each dataset. You could download the pre-trained model by
 ```shell
-python scripts/download_model.py --model pix2pix --task edges2shoes-r_lite --stage mobile
+python scripts/download_model.py --model pix2pix --task edges2shoes-r --stage full
 ```
 
 and test the model by
 
 ```shell
-bash scripts/pix2pix/edges2shoes-r_lite/test_mobile.sh
+bash scripts/pix2pix/edges2shoes-r/test_full.sh
 ```
 
 ##### "Once-for-all" Network Training
 
-Train a "once-for-all" network from a pre-trained student model to search for the efficient architectures.
+Train a "once-for-all" network from scratch to search for the efficient architectures.
 
 ```shell
 bash scripts/pix2pix/edges2shoes-r_lite/train_supernet.sh
@@ -114,7 +114,7 @@ python select_arch.py --macs 6.5e9 --fid 32 \
 
 ##### Fine-tuning the Best Model
 
-(Optional) Fine-tune a specific subnet within the pre-trained "once-for-all" network. To further improve the performance of your chosen subnet, you may need to fine-tune the subnet. For example, if you want to fine-tune a subnet within the "once-for-all" network with `'config_str': 32_32_48_40_64_40_16_32`, use the following command:
+(Optional) Fine-tune a specific subnet within the pre-trained "once-for-all" network. To further improve the performance of your chosen subnet, you may need to fine-tune the subnet. For example, if you want to fine-tune a subnet within the "once-for-all" network with `'config_str': 32_32_40_40_40_64_16_16`, use the following command:
 
 ```shell
 bash scripts/pix2pix/edges2shoes-r_lite/finetune.sh 32_32_48_40_64_40_16_32
@@ -122,39 +122,39 @@ bash scripts/pix2pix/edges2shoes-r_lite/finetune.sh 32_32_48_40_64_40_16_32
 
 ##### Export the Model
 
-Extract a subnet from the "once-for-all" network. We provide a code [export.py](../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `32_32_48_32_48_48_16_16`, then you can export the model by this command:
+Extract a subnet from the "once-for-all" network. We provide a code [export.py](../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `32_32_40_40_40_64_16_16`, then you can export the model by this command:
 
 ```shell
-bash scripts/pix2pix/edges2shoes-r_lite/export.sh 32_32_48_40_64_40_16_32
+bash scripts/pix2pix/edges2shoes-r_lite/export.sh 32_32_40_40_40_64_16_16
 ```
 
 ## CycleGAN Model Compression
 
 The pipeline is almost identical to pix2pix. We will show the pipeline on `horse2zebra` dataset.
 
-##### Train a MobileNet Teacher Model
+##### Train an Original Full Teacher Model (if you already have the full model, you could skip it)
 
-Train a MobileNet-style teacher model from scratch.
+Train an original full teacher model from scratch.
 
 ```shell
-bash scripts/cycle_gan/horse2zebra_lite/train_mobile.sh
+bash scripts/cycle_gan/horse2zebra/train_full.sh
 ```
 
 We provide a pre-trained teacher model for each dataset. You could download the model using
 
 ```shell
-python scripts/download_model.py --model cycle_gan --task horse2zebra_lite --stage mobile
+python scripts/download_model.py --model cycle_gan --task horse2zebra --stage full
 ```
 
 and test the model by
 
 ```shell
-bash scripts/cycle_gan/horse2zebra_lite/test_mobile.sh
+bash scripts/cycle_gan/horse2zebra/test_full.sh
 ```
 
 ##### "Once-for-all" Network Training
 
-Train a "once-for-all" network from a pre-trained student model to search for the efficient architectures.
+Train a "once-for-all" network from scratch to search for the efficient architectures.
 
 ```shell
 bash scripts/cycle_gan/horse2zebra_lite/train_supernet.sh
@@ -183,8 +183,8 @@ During our experiments, we observe that fine-tuning the model on horse2zebra inc
 
 ##### Export the Model
 
-Extract a subnet from the supernet. We provide a code [export.py](../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `24_16_32_16_32_64_16_24`, then you can export the model by this command:
+Extract a subnet from the supernet. We provide a code [export.py](../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `16_16_24_16_32_64_16_24`, then you can export the model by this command:
 
 ```shell
-bash scripts/cycle_gan/horse2zebra_lite/export.sh 24_16_32_16_32_64_16_24
+bash scripts/cycle_gan/horse2zebra_lite/export.sh 16_16_24_16_32_64_16_24
 ```
