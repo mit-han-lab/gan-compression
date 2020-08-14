@@ -6,7 +6,7 @@ import wget
 
 def check(opt):
     if opt.model == 'pix2pix':
-        assert opt.task in ['edges2shoes-r', 'map2sat', 'cityscapes', 'edges2shoes-r_lite']
+        assert opt.task in ['edges2shoes-r', 'map2sat', 'cityscapes', 'edges2shoes-r_lite', 'map2sat_lite']
     elif opt.model == 'cycle_gan':
         assert opt.task in ['horse2zebra', 'horse2zebra_lite']
     elif opt.model == 'gaugan':
