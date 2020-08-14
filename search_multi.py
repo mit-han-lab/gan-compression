@@ -15,9 +15,9 @@ from torch.backends import cudnn
 
 from configs import encode_config
 from data import create_dataloader
-from metric import get_fid, get_mIoU
+from metric import get_fid, get_cityscapes_mIoU
 from metric.inception import InceptionV3
-from metric.mIoU_score import DRNSeg
+from metric.cityscapes_mIoU import DRNSeg
 from models import create_model
 from options.search_options import SearchOptions
 from utils import util
@@ -100,10 +100,10 @@ def main(configs, opt, gpu_id, queue, verbose):
                 result['fid'] = 1e9
         if 'cityscapes' in opt.dataroot and opt.direction == 'BtoA':
             if qualified:
-                mIoU = get_mIoU(fakes, names, drn_model, device,
-                                data_dir=opt.cityscapes_path,
-                                batch_size=opt.batch_size,
-                                num_workers=opt.num_threads, use_tqdm=False)
+                mIoU = get_cityscapes_mIoU(fakes, names, drn_model, device,
+                                           data_dir=opt.cityscapes_path,
+                                           batch_size=opt.batch_size,
+                                           num_workers=opt.num_threads, use_tqdm=False)
                 result['mIoU'] = mIoU
             else:
                 result['mIoU'] = mIoU
@@ -113,6 +113,9 @@ def main(configs, opt, gpu_id, queue, verbose):
 
 
 if __name__ == '__main__':
+    warnings.warn(
+        'This script is deprecated. Please set up multi-GPU searching manually '
+        '(for more details, please refer to ./docs/training_tutorial.md).')
     mp.set_start_method('spawn')
     opt = SearchOptions().parse()
     print(' '.join(sys.argv), flush=True)
