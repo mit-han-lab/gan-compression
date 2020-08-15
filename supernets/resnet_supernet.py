@@ -11,7 +11,7 @@ from configs import decode_config
 from configs.resnet_configs import get_configs
 from configs.single_configs import SingleConfigs
 from distillers.base_resnet_distiller import BaseResnetDistiller
-from metric import get_fid, get_cityscapes_mIoU
+from metric import get_fid, get_mIoU
 from models.modules.super_modules import SuperConv2d
 from utils import util
 from utils.weight_transfer import load_pretrained_weight
@@ -154,7 +154,7 @@ class ResnetSupernet(BaseResnetDistiller):
             ret['metric/fid_%s-best' % config_name] = getattr(self, 'best_fid_%s' % config_name)
 
             if 'cityscapes' in self.opt.dataroot:
-                mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
+                mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
                                            table_path=self.opt.table_path,
                                            data_dir=self.opt.cityscapes_path,
                                            batch_size=self.opt.eval_batch_size,
