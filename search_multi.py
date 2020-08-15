@@ -15,7 +15,7 @@ from torch.backends import cudnn
 
 from configs import encode_config
 from data import create_dataloader
-from metric import get_fid, get_cityscapes_mIoU
+from metric import get_fid, get_mIoU
 from metric.inception import InceptionV3
 from metric.cityscapes_mIoU import DRNSeg
 from models import create_model
