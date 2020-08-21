@@ -1,6 +1,6 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [demo](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex)
-**[NEW!]** The [lite pipeline](docs/lite_pipeline.md) (GAN Compression Lite) is updated, which could produce comparable results as the full pipeline! The lite version of [map2sat](scripts/pix2pix/map2sat_lite) is released!
+**[NEW!]** The [lite pipeline](docs/lite_pipeline.md) (GAN Compression Lite) is updated, which could produce comparable results as the full pipeline with much simpler procedure! The lite version of [map2sat](scripts/pix2pix/map2sat_lite) is released!
 
 **[NEW!]** The lite pipeline (GAN Compression Lite) is released! Check the [tutorial](docs/lite_pipeline.md) for the pipeline.
 
@@ -197,9 +197,155 @@ You will get a preprocessed dataset in `database/cityscapes` and a mapping table
 
 To support mIoU computation, you need to download a pre-trained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. Then you can test our compressed models on cityscapes after you have downloaded our compressed models.
 
-## [Training](docs/training_tutorial.md)
+### Performance of Released Models
 
-Please refer to our training [tutorial](docs/training_tutorial.md) on how to train models on our datasets and your own.
+We retrained the models with our released codebase, so there may be some slight differences between our released models and the results in the paper.
+
+<table style="undefined;table-layout: fixed; width: 868px">
+<colgroup>
+<col style="width: 130px">
+<col style="width: 130px">
+<col style="width: 130px">
+<col style="width: 130px">
+<col style="width: 130px">
+<col style="width: 109px">
+<col style="width: 109px">
+</colgroup>
+<thead>
+  <tr>
+    <th rowspan="2">Model</th>
+    <th rowspan="2">Dataset</th>
+    <th rowspan="2">Method</th>
+    <th rowspan="2">#Parameters</th>
+    <th rowspan="2">MACs</th>
+    <th colspan="2">Metric</th>
+  </tr>
+  <tr>
+    <td>FID</td>
+    <td>mIoU</td>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td rowspan="3">CycleGAN</td>
+    <td rowspan="3">horse→zebra</td>
+    <td>Original</td>
+    <td>11.4M</td>
+    <td>56.8G</td>
+    <td>65.75</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline</td>
+    <td>0.357</td>
+    <td>2.55G</td>
+    <td>65.12</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Lite Pipeline</td>
+    <td>0.355M</td>
+    <td>2.64G</td>
+    <td>65.19</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td rowspan="9">Pix2pix</td>
+    <td rowspan="3">edges→shoes</td>
+    <td>Original</td>
+    <td>11.4M</td>
+    <td>56.8G</td>
+    <td>24.12</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline</td>
+    <td>0.822M</td>
+    <td>4.99G</td>
+    <td>26.70</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Lite Pipeline</td>
+    <td>0.756M</td>
+    <td>4.61G</td>
+    <td>25.26</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td rowspan="3">Cityscapes</td>
+    <td>Original</td>
+    <td>11.4M</td>
+    <td>56.8G</td>
+    <td>61.50</td>
+    <td>42.06</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline</td>
+    <td>0.781M</td>
+    <td>5.59G</td>
+    <td>73.45</td>
+    <td>38.63</td>
+  </tr>
+  <tr>
+    <td>Lite Pipeline</td>
+    <td>NA</td>
+    <td>NA</td>
+    <td>NA</td>
+    <td>NA</td>
+  </tr>
+  <tr>
+    <td rowspan="3">map→arial photo<br></td>
+    <td>Original</td>
+    <td>11.4M</td>
+    <td>56.8G</td>
+    <td>47.91</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline</td>
+    <td>0.784M</td>
+    <td>4.84G</td>
+    <td>49.00</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Lite Pipeline</td>
+    <td>0.708M</td>
+    <td>4.53G</td>
+    <td>48.38</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td rowspan="3">GauGAN</td>
+    <td rowspan="3">Cityscapes</td>
+    <td>Original</td>
+    <td>93.0M</td>
+    <td>281G</td>
+    <td>57.60</td>
+    <td>61.04</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline</td>
+    <td>21.0M</td>
+    <td>31.2G</td>
+    <td>56.43</td>
+    <td>60.29</td>
+  </tr>
+  <tr>
+    <td>Lite Pipeline</td>
+    <td>NA</td>
+    <td>NA</td>
+    <td>NA</td>
+    <td>NA</td>
+  </tr>
+</tbody>
+</table>
+
+
+## Training
+
+Please refer to the [lite_pipeline.md](docs/lite_pipeline.md) and [full_pipeline.md](docs/full_pipeline.md) on how to train models on our datasets and your own.
 
 ### FID Computation
 
