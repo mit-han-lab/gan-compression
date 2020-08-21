@@ -342,8 +342,7 @@ We retrained the models with our released codebase, so there may be some slight 
 </tbody>
 </table>
 
-
-## Training
+### Training
 
 Please refer to the [lite_pipeline.md](docs/lite_pipeline.md) and [full_pipeline.md](docs/full_pipeline.md) on how to train models on our datasets and your own.
 
