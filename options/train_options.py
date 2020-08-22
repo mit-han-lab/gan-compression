@@ -42,6 +42,8 @@ class TrainOptions(BaseOptions):
         parser.add_argument('--ndf', type=int, default=128, help='the base number of discriminator filters')
         parser.add_argument('--n_layers_D', type=int, default=3, help='only used if netD==n_layers')
         parser.add_argument('--dropout_rate', type=float, default=0, help='the dropout rate of the generator')
+        parser.add_argument('--restore_O_path', type=str, default=None,
+                            help='the path to restore the optimizer')
 
         # training parameters
         parser.add_argument('--nepochs', type=int, default=5,
