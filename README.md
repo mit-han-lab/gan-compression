@@ -97,7 +97,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   bash scripts/cycle_gan/horse2zebra/latency_compressed.sh
   ```
 
-* There may be a little differences between the results of above models and those of the paper. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
+* There may be a little differences between the results of above models and those of the paper since we retrained the models. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
 
   ```bash
   python scripts/download_model.py --model cyclegan --task horse2zebra --stage legacy
@@ -149,7 +149,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   bash scripts/pix2pix/edges2shoes-r/latency_compressed.sh
   ```
 
-* There may be a little differences between the results of above models and those of the paper. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
+* There may be a little differences between the results of above models and those of the paper since we retrained the models. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
 
   ```shell
   python scripts/download_model.py --model pix2pix --task edges2shoes-r --stage legacy
@@ -196,7 +196,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   bash scripts/gaugan/cityscapes/latency_compressed.sh
   ```
 
-* There may be a little differences between the results of above models and those of the paper. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
+* There may be a little differences between the results of above models and those of the paper since we retrained the models. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
 
   ```shell
   python scripts/download_model.py --model gaugan --task cityscapes --stage legacy
