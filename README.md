@@ -237,7 +237,7 @@ We retrained the models with our released codebase, so there may be some slight 
   </tr>
   <tr>
     <td>Full Pipeline</td>
-    <td>0.357</td>
+    <td>0.357M</td>
     <td>2.55G</td>
     <td>65.12</td>
     <td>--</td>
