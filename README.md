@@ -1,5 +1,5 @@
 # GAN Compression
-### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [demo](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex)
+### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [videos](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex) | [slides](![img](https://hanlab.mit.edu/projects/gancompression/imgs/slides_thumb.jpg)) 
 **[NEW!]** The [lite pipeline](docs/lite_pipeline.md) (GAN Compression Lite) is updated, which could produce comparable results as the full pipeline with much simpler procedure! The lite version of [map2sat](scripts/pix2pix/map2sat_lite) is released!
 
 **[NEW!]** The lite pipeline (GAN Compression Lite) is released! Check the [tutorial](docs/lite_pipeline.md) for the pipeline.
@@ -10,7 +10,8 @@
 
 **[NEW!]** The compressed model and test codes of GauGAN are released! Check [here](#gaugan) to use our models.
 
-![teaser](imgs/teaser.png)*We introduce GAN Compression, a general-purpose method for compressing conditional GANs. Our method reduces the computation of widely-used conditional GAN models, including pix2pix, CycleGAN, and GauGAN, by 9-21x while preserving the visual fidelity. Our method is effective for a wide range of generator architectures, learning objectives, and both paired and unpaired settings.*
+![teaser](imgs/teaser.png)
+*We introduce GAN Compression, a general-purpose method for compressing conditional GANs. Our method reduces the computation of widely-used conditional GAN models, including pix2pix, CycleGAN, and GauGAN, by 9-21x while preserving the visual fidelity. Our method is effective for a wide range of generator architectures, learning objectives, and both paired and unpaired settings.*
 
 GAN Compression: Efficient Architectures for Interactive Conditional GANs<br>
 [Muyang Li](https://lmxyy.me/), [Ji Lin](http://linji.me/), [Yaoyao Ding](https://yaoyaoding.com/), [Zhijian Liu](http://zhijianliu.com/), [Jun-Yan Zhu](https://www.cs.cmu.edu/~junyanz/), and [Song Han](https://songhan.mit.edu/)<br>
@@ -96,6 +97,14 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   bash scripts/cycle_gan/horse2zebra/latency_compressed.sh
   ```
 
+* There may be a little differences between the results of above models and those of the paper. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
+
+  ```bash
+  python scripts/download_model.py --model cyclegan --task horse2zebra --stage legacy
+  bash scripts/cycle_gan/horse2zebra/test_legacy.sh
+  bash scripts/cycle_gan/horse2zebra/latency_legacy.sh
+  ```
+
 ### Pix2pix
 
 #### Setup
@@ -132,7 +141,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   ```shell
   bash scripts/pix2pix/edges2shoes-r/test_compressed.sh
   ```
-
+  
 * Measure the latency of the two models.
 
   ```shell
@@ -140,6 +149,13 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   bash scripts/pix2pix/edges2shoes-r/latency_compressed.sh
   ```
 
+* There may be a little differences between the results of above models and those of the paper. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
+
+  ```shell
+  python scripts/download_model.py --model pix2pix --task edges2shoes-r --stage legacy
+  bash scripts/pix2pix/edges2shoes-r/test_legacy.sh
+  bash scripts/pix2pix/edges2shoes-r/latency_legacy.sh
+  ```
 
 ### <span id="gaugan">GauGAN</span>
 
@@ -180,6 +196,14 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   bash scripts/gaugan/cityscapes/latency_compressed.sh
   ```
 
+* There may be a little differences between the results of above models and those of the paper. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
+
+  ```shell
+  python scripts/download_model.py --model gaugan --task cityscapes --stage legacy
+  bash scripts/gaugan/cityscapes/test_legacy.sh
+  bash scripts/gaugan/cityscapes/latency_legacy.sh
+  ```
+
 ### <span id="cityscapes">Cityscapes Dataset</span>
 
 For the Cityscapes dataset, we cannot provide it due to license issue. Please download the dataset from https://cityscapes-dataset.com and use the script [prepare_cityscapes_dataset.py](datasets/prepare_cityscapes_dataset.py) to preprocess it. You need to download `gtFine_trainvaltest.zip` and `leftImg8bit_trainvaltest.zip` and unzip them in the same folder. For example, you may put `gtFine` and `leftImg8bit` in `database/cityscapes-origin`. You need to prepare the dataset with the following commands:
@@ -199,7 +223,7 @@ To support mIoU computation, you need to download a pre-trained DRN model `drn-d
 
 ### Performance of Released Models
 
-We retrained the models with our released codebase, so there may be some slight differences between our released models and the results in the paper.
+Here we show the performance of all our released models:
 
 <table style="undefined;table-layout: fixed; width: 868px">
 <colgroup>
@@ -227,8 +251,8 @@ We retrained the models with our released codebase, so there may be some slight 
 </thead>
 <tbody>
   <tr>
-    <td rowspan="3">CycleGAN</td>
-    <td rowspan="3">horse→zebra</td>
+    <td rowspan="4">CycleGAN</td>
+    <td rowspan="4">horse→zebra</td>
     <td>Original</td>
     <td>11.4M</td>
     <td>56.8G</td>
@@ -236,7 +260,14 @@ We retrained the models with our released codebase, so there may be some slight 
     <td>--</td>
   </tr>
   <tr>
-    <td>Full Pipeline</td>
+    <td>Full Pipeline (Paper)</td>
+    <td>0.342M</td>
+    <td>2.67G</td>
+    <td>65.33</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline (Retrained)</td>
     <td>0.357M</td>
     <td>2.55G</td>
     <td>65.12</td>
@@ -250,8 +281,8 @@ We retrained the models with our released codebase, so there may be some slight 
     <td>--</td>
   </tr>
   <tr>
-    <td rowspan="9">Pix2pix</td>
-    <td rowspan="3">edges→shoes</td>
+    <td rowspan="11">Pix2pix</td>
+    <td rowspan="4">edges→shoes</td>
     <td>Original</td>
     <td>11.4M</td>
     <td>56.8G</td>
@@ -259,7 +290,14 @@ We retrained the models with our released codebase, so there may be some slight 
     <td>--</td>
   </tr>
   <tr>
-    <td>Full Pipeline</td>
+    <td>Full Pipeline (Paper)</td>
+    <td>0.700M</td>
+    <td>4.81G</td>
+    <td>26.60</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline (Retrained)</td>
     <td>0.822M</td>
     <td>4.99G</td>
     <td>26.70</td>
@@ -273,7 +311,7 @@ We retrained the models with our released codebase, so there may be some slight 
     <td>--</td>
   </tr>
   <tr>
-    <td rowspan="3">Cityscapes</td>
+    <td rowspan="4">Cityscapes</td>
     <td>Original</td>
     <td>11.4M</td>
     <td>56.8G</td>
@@ -281,7 +319,14 @@ We retrained the models with our released codebase, so there may be some slight 
     <td>42.06</td>
   </tr>
   <tr>
-    <td>Full Pipeline</td>
+    <td>Full Pipeline (Paper)</td>
+    <td>0.707M</td>
+    <td>5.66G</td>
+    <td>72.24</td>
+    <td>40.77</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline (Retrained)</td>
     <td>0.781M</td>
     <td>5.59G</td>
     <td>73.45</td>
@@ -304,9 +349,9 @@ We retrained the models with our released codebase, so there may be some slight 
   </tr>
   <tr>
     <td>Full Pipeline</td>
-    <td>0.784M</td>
-    <td>4.84G</td>
-    <td>49.00</td>
+    <td>0.746M</td>
+    <td>4.68G</td>
+    <td>48.02</td>
     <td>--</td>
   </tr>
   <tr>
@@ -317,8 +362,8 @@ We retrained the models with our released codebase, so there may be some slight 
     <td>--</td>
   </tr>
   <tr>
-    <td rowspan="3">GauGAN</td>
-    <td rowspan="3">Cityscapes</td>
+    <td rowspan="4">GauGAN</td>
+    <td rowspan="4">Cityscapes</td>
     <td>Original</td>
     <td>93.0M</td>
     <td>281G</td>
@@ -326,7 +371,14 @@ We retrained the models with our released codebase, so there may be some slight 
     <td>61.04</td>
   </tr>
   <tr>
-    <td>Full Pipeline</td>
+    <td>Full Pipeline (Paper)</td>
+    <td>20.4M</td>
+    <td>31.7G</td>
+    <td>55.19</td>
+    <td>61.22</td>
+  </tr>
+  <tr>
+    <td>Full Pipeline (Retrained)</td>
     <td>21.0M</td>
     <td>31.2G</td>
     <td>56.43</td>

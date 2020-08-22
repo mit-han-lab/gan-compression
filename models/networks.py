@@ -156,6 +156,12 @@ def define_G(input_nc, output_nc, ngf, netG, norm='batch', dropout_rate=0,
         config = decode_config(opt.config_str)
         net = SubMobileResnetGenerator(input_nc, output_nc, config, norm_layer=norm_layer,
                                        dropout_rate=dropout_rate, n_blocks=9)
+    elif netG == 'legacy_sub_mobile_resnet_9blocks':
+        from .modules.resnet_architecture.legacy_sub_mobile_resnet_generator import LegacySubMobileResnetGenerator
+        assert opt.config_str is not None
+        config = decode_config(opt.config_str)
+        net = LegacySubMobileResnetGenerator(input_nc, output_nc, config, norm_layer=norm_layer,
+                                             dropout_rate=dropout_rate, n_blocks=9)
     elif netG == 'spade':
         from .modules.spade_architecture.spade_generator import SPADEGenerator
         net = SPADEGenerator(opt)
@@ -233,6 +239,9 @@ def get_netG_cls(netG):
     elif netG == 'sub_mobile_resnet_9blocks':
         from models.modules.resnet_architecture.sub_mobile_resnet_generator import SubMobileResnetGenerator
         return SubMobileResnetGenerator
+    elif netG == 'legacy_sub_mobile_resnet_9blocks':
+        from models.modules.resnet_architecture.legacy_sub_mobile_resnet_generator import LegacySubMobileResnetGenerator
+        return LegacySubMobileResnetGenerator
     elif netG == 'spade':
         from models.modules.spade_architecture.spade_generator import SPADEGenerator
         return SPADEGenerator

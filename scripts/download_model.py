@@ -25,7 +25,7 @@ def download(path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Download a pretrained model.')
     parser.add_argument('--stage', type=str, default='compressed',
-                        choices=['full', 'mobile', 'distill', 'supernet', 'finetune', 'compressed'],
+                        choices=['full', 'mobile', 'distill', 'supernet', 'finetune', 'compressed', 'legacy'],
                         help='specify the stage you want to download')
     parser.add_argument('--model', type=str, default='pix2pix',
                         choices=['pix2pix', 'cycle_gan', 'gaugan'],
