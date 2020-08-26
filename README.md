@@ -1,5 +1,8 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [videos](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex) | [slides](https://hanlab.mit.edu/projects/gancompression/resources/546-slides.pdf) 
+
+**[NEW!]** The lite version of [GauGAN](scripts/gaugan/cityscapes_lite) is released, which could also produce comparable results as the full GauGAN pipeline!
+
 **[NEW!]** The [lite pipeline](docs/lite_pipeline.md) (GAN Compression Lite) is updated, which could produce comparable results as the full pipeline with much simpler procedure! The lite version of [map2sat](scripts/pix2pix/map2sat_lite) is released!
 
 **[NEW!]** The lite pipeline (GAN Compression Lite) is released! Check the [tutorial](docs/lite_pipeline.md) for the pipeline.
@@ -7,8 +10,6 @@
 **[NEW!]** GauGAN training code and tutorial is released! Check the [tutorial](docs/training_tutorial.md) to compress GauGAN.
 
 **[NEW!]** Correct metric naming and update the evaluation protocol. Support MACs budget for searching.
-
-**[NEW!]** The compressed model and test codes of GauGAN are released! Check [here](#gaugan) to use our models.
 
 ![teaser](imgs/teaser.png)
 *We introduce GAN Compression, a general-purpose method for compressing conditional GANs. Our method reduces the computation of widely-used conditional GAN models, including pix2pix, CycleGAN, and GauGAN, by 9-21x while preserving the visual fidelity. Our method is effective for a wide range of generator architectures, learning objectives, and both paired and unpaired settings.*
@@ -26,6 +27,12 @@ In CVPR 2020.
 ## Overview
 
 ![overview](imgs/overview.png)*GAN Compression framework: ① Given a pre-trained teacher generator G', we distill a smaller “once-for-all” student generator G that contains all possible channel numbers through weight sharing. We choose different channel numbers for the student generator G at each training step. ② We then extract many sub-generators from the “once-for-all” generator and evaluate their performance. No retraining is needed, which is the advantage of the “once-for-all” generator. ③ Finally, we choose the best sub-generator given the compression ratio target and performance target (FID or mIoU), perform fine-tuning, and obtain the final compressed model.*
+
+## Performance
+
+![performance](imgs/performance.jpeg)
+
+*GAN Compression reduces the computation of pix2pix, cycleGAN and GauGAN by 9-21x, and model size by 4.6-33x.*
 
 ## Colab Notebook
 
@@ -386,13 +393,14 @@ Here we show the performance of all our released models:
   </tr>
   <tr>
     <td>Lite Pipeline</td>
-    <td>NA</td>
-    <td>NA</td>
-    <td>NA</td>
-    <td>NA</td>
+    <td>20.2M</td>
+    <td>31.3G</td>
+    <td>56.25</td>
+    <td>61.17</td>
   </tr>
 </tbody>
 </table>
+
 
 ### Training
 

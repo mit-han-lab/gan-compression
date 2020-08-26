@@ -64,8 +64,8 @@ def get_configs(config_name):
         return SPADEConfigs(n_channels=[[48, 40, 32],
                                         [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
                                         [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
-    elif config_name == 'debug':
-        return SPADEConfigs(n_channels=[[48],
-                                        [48], [48], [48], [48],
-                                        [48], [48], [48]])
+    if config_name == 'channels-64':
+        return SPADEConfigs(n_channels=[[64, 48, 40, 32],
+                                        [64, 48, 40, 32], [64, 48, 40, 32], [64, 48, 40, 32], [64, 48, 40, 32],
+                                        [64, 48, 40, 32, 24], [64, 48, 40, 32, 24], [64, 48, 40, 32, 24]])
     raise NotImplementedError('Unknown configuration [%s]!!!' % config_name)
