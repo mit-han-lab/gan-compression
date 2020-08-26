@@ -425,7 +425,7 @@ To help users better understand and use our code, we briefly overview the functi
 
 ## Citation
 
-If you use this code for your research, please cite our [paper](https://arxiv.org/pdf/2003.08936).
+If you use this code for your research, please cite our [paper](https://arxiv.org/abs/2003.08936).
 ```
 @inproceedings{li2020gan,
   title={GAN Compression: Efficient Architectures for Interactive Conditional GANs},
