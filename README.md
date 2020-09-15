@@ -82,8 +82,8 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 * Download the pre-trained models.
 
   ```shell
-  python scripts/download_model.py --model cyclegan --task horse2zebra --stage full
-  python scripts/download_model.py --model cyclegan --task horse2zebra --stage compressed
+  python scripts/download_model.py --model cycle_gan --task horse2zebra --stage full
+  python scripts/download_model.py --model cycle_gan --task horse2zebra --stage compressed
   ```
 
 * Test the original full model.
@@ -107,7 +107,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 * There may be a little differences between the results of above models and those of the paper since we retrained the models. We also release the compressed models of the paper. If there are such inconsistencies, you could try the following commands to test our paper models:
 
   ```bash
-  python scripts/download_model.py --model cyclegan --task horse2zebra --stage legacy
+  python scripts/download_model.py --model cycle_gan --task horse2zebra --stage legacy
   bash scripts/cycle_gan/horse2zebra/test_legacy.sh
   bash scripts/cycle_gan/horse2zebra/latency_legacy.sh
   ```
