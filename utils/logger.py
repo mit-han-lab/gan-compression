@@ -13,6 +13,10 @@ class Logger:
         now = time.strftime('%c')
         self.log_file.write('================ (%s) ================\n' % now)
         self.log_file.flush()
+        self.progress_bar = None
+
+    def set_progress_bar(self, progress_bar):
+        self.progress_bar = progress_bar
 
     def plot(self, items, step):
         if len(items) == 0:
@@ -29,9 +33,11 @@ class Logger:
                 continue
             kk = k.split('/')[-1]
             message += '%s: %.3f ' % (kk, v)
-
-        print(message, flush=True)
-        self.log_file.write('%s\n' % message)
+        if self.progress_bar is None:
+            print(message, flush=True)
+        else:
+            self.progress_bar.write(message)
+        self.log_file.write(message + '\n')
         self.log_file.flush()
 
     def print_current_metrics(self, epoch, i, metrics, t):
@@ -40,10 +46,15 @@ class Logger:
         for k, v in metrics.items():
             kk = k.split('/')[-1]
             message += '%s: %.3f ' % (kk, v)
-
-        print(message, flush=True)
-        self.log_file.write('%s\n' % message)
+        if self.progress_bar is None:
+            print(message, flush=True)
+        else:
+            self.progress_bar.write(message)
+        self.log_file.write(message + '\n')
 
     def print_info(self, message):
-        print(message, flush=True)
+        if self.progress_bar is None:
+            print(message, flush=True)
+        else:
+            self.progress_bar.write(message)
         self.log_file.write(message + '\n')

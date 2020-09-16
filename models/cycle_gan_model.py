@@ -8,9 +8,9 @@ from torch import nn
 from tqdm import tqdm
 
 from data import create_eval_dataloader
-from metric import get_fid, get_mIoU
+from metric import get_fid, get_cityscapes_mIoU
+from metric.cityscapes_mIoU import DRNSeg
 from metric.inception import InceptionV3
-from metric.mIoU_score import DRNSeg
 from utils import util
 from utils.image_pool import ImagePool
 from . import networks
@@ -274,11 +274,9 @@ class CycleGANModel(BaseModel):
             eval_dataloader = getattr(self, 'eval_dataloader_' + direction)
             fakes, names = [], []
             cnt = 0
-            # print(len(eval_dataset))
-            for i, data_i in enumerate(tqdm(eval_dataloader)):
+            for i, data_i in enumerate(tqdm(eval_dataloader, desc='Eval %s  ' % direction, position=2, leave=False)):
                 self.set_single_input(data_i)
                 self.test_single_side(direction)
-                # print(self.image_paths)
                 fakes.append(self.fake_B.cpu())
                 for j in range(len(self.image_paths)):
                     short_path = ntpath.basename(self.image_paths[j])
@@ -295,7 +293,7 @@ class CycleGANModel(BaseModel):
 
             suffix = direction[-1]
             fid = get_fid(fakes, self.inception_model, getattr(self, 'npz_%s' % direction[-1]),
-                          device=self.device, batch_size=self.opt.eval_batch_size)
+                          device=self.device, batch_size=self.opt.eval_batch_size, tqdm_position=2)
             if fid < getattr(self, 'best_fid_%s' % suffix):
                 self.is_best = True
                 setattr(self, 'best_fid_%s' % suffix, fid)
@@ -309,11 +307,11 @@ class CycleGANModel(BaseModel):
             ret['metric/fid_%s-best' % suffix] = getattr(self, 'best_fid_%s' % suffix)
 
             if 'cityscapes' in self.opt.dataroot and direction == 'BtoA':
-                mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                                table_path=self.opt.table_path,
-                                data_dir=self.opt.cityscapes_path,
-                                batch_size=self.opt.eval_batch_size,
-                                num_workers=self.opt.num_threads)
+                mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
+                                           table_path=self.opt.table_path,
+                                           data_dir=self.opt.cityscapes_path,
+                                           batch_size=self.opt.eval_batch_size,
+                                           num_workers=self.opt.num_threads, tqdm_position=2)
                 if mIoU > self.best_mIoU:
                     self.is_best = True
                     self.best_mIoU = mIoU

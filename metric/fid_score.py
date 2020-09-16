@@ -145,7 +145,7 @@ def get_activations(files, model, batch_size=50, dims=2048,
 
 
 def get_activations_from_ims(ims, model, batch_size=50, dims=2048,
-                             device=None, verbose=False, use_tqdm=True):
+                             device=None, verbose=False, tqdm_position=None):
     """Calculates the activations of the pool_3 layer for all images.
 
     Params:
@@ -181,12 +181,12 @@ def get_activations_from_ims(ims, model, batch_size=50, dims=2048,
 
     pred_arr = np.empty((n_used_imgs, dims))
 
-    if use_tqdm:
-        from tqdm import tqdm
+    if tqdm_position is None or tqdm_position >= 0:
+        import tqdm
+        dataloader_tqdm = tqdm.trange(n_batches, desc='FID', position=tqdm_position, leave=False)
     else:
-        def tqdm(x):
-            return x
-    for i in tqdm(range(n_batches)):
+        dataloader_tqdm = range(n_batches)
+    for i in dataloader_tqdm:
         start = i * batch_size
         end = start + batch_size
         if end > len(ims):
@@ -322,14 +322,14 @@ def _compute_statistics_of_path(path, model, batch_size, dims, cuda, use_tqdm=Fa
     return m, s
 
 
-def _compute_statistics_of_ims(ims, model, batch_size, dims, device, use_tqdm=True):
-    act = get_activations_from_ims(ims, model, batch_size, dims, device, verbose=False, use_tqdm=use_tqdm)
+def _compute_statistics_of_ims(ims, model, batch_size, dims, device, tqdm_position=None):
+    act = get_activations_from_ims(ims, model, batch_size, dims, device, verbose=False, tqdm_position=tqdm_position)
     mu = np.mean(act, axis=0)
     sigma = np.cov(act, rowvar=False)
     return mu, sigma
 
 
-def calculate_fid_given_ims(ims_fake, ims_real, batch_size, cuda, dims, model=None, use_tqdm=False):
+def calculate_fid_given_ims(ims_fake, ims_real, batch_size, cuda, dims, model=None, tqdm_position=None):
     if model is None:
         block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
 
@@ -338,9 +338,9 @@ def calculate_fid_given_ims(ims_fake, ims_real, batch_size, cuda, dims, model=No
             model.cuda()
 
     m1, s1 = _compute_statistics_of_ims(ims_fake, model, batch_size,
-                                        dims, cuda, use_tqdm=use_tqdm)
+                                        dims, cuda, tqdm_position=tqdm_position)
     m2, s2 = _compute_statistics_of_ims(ims_real, model, batch_size,
-                                        dims, cuda, use_tqdm=use_tqdm)
+                                        dims, cuda, tqdm_position=tqdm_position)
 
     fid_value = calculate_frechet_distance(m1, s1, m2, s2)
 

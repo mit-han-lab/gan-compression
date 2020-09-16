@@ -65,7 +65,6 @@ def main(opt):
         from models.modules.spade_architecture.mobile_spade_generator import MobileSPADEGenerator as SuperModel
         from models.modules.spade_architecture.sub_mobile_spade_generator import SubMobileSPADEGenerator as SubModel
         opt.norm_G = 'spadesyncbatch3x3'
-        opt.num_upsampling_layers = 'more'
         opt.semantic_nc = opt.input_nc + (1 if opt.contain_dontcare_label else 0) + (0 if opt.no_instance else 1)
         super_model = SuperModel(opt)
         sub_model = SubModel(opt, config)
@@ -105,5 +104,9 @@ if __name__ == '__main__':
                         help='then crop to this size')
     parser.add_argument('--aspect_ratio', type=float, default=2.0,
                         help='The ratio width/height. The final height of the load image will be crop_size/aspect_ratio')
+    parser.add_argument('--num_upsampling_layers',
+                        choices=('normal', 'more', 'most'), default='more',
+                        help="If 'more', adds upsampling layer between the two middle resnet blocks. "
+                             "If 'most', also add one more upsampling + resnet layer at the end of the generator")
     opt = parser.parse_args()
     main(opt)

@@ -5,7 +5,7 @@ import os
 import torch
 from tqdm import tqdm
 
-from metric import get_fid, get_mIoU
+from metric import get_fid, get_cityscapes_mIoU
 from models import networks
 from utils import util
 from .base_spade_distiller import BaseSPADEDistiller
@@ -49,7 +49,7 @@ class SPADEDistiller(BaseSPADEDistiller):
         fakes, names = [], []
         ret = {}
         cnt = 0
-        for i, data_i in enumerate(tqdm(self.eval_dataloader)):
+        for i, data_i in enumerate(tqdm(self.eval_dataloader, desc='Eval       ', position=2, leave=False)):
             self.set_input(data_i)
             self.test()
             fakes.append(self.Sfake_B.cpu())
@@ -68,8 +68,8 @@ class SPADEDistiller(BaseSPADEDistiller):
                     util.save_image(Sfake_im, os.path.join(save_dir, 'Sfake', '%s.png' % name), create_dir=True)
                 cnt += 1
         if not self.opt.no_fid:
-            fid = get_fid(fakes, self.inception_model, self.npz,
-                          device=self.device, batch_size=self.opt.eval_batch_size)
+            fid = get_fid(fakes, self.inception_model, self.npz, device=self.device,
+                          batch_size=self.opt.eval_batch_size, tqdm_position=2)
             if fid < self.best_fid:
                 self.is_best = True
                 self.best_fid = fid
@@ -80,11 +80,11 @@ class SPADEDistiller(BaseSPADEDistiller):
             ret['metric/fid-mean'] = sum(self.fids) / len(self.fids)
             ret['metric/fid-best'] = self.best_fid
         if 'cityscapes' in self.opt.dataroot and not self.opt.no_mIoU:
-            mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                            table_path=self.opt.table_path,
-                            data_dir=self.opt.cityscapes_path,
-                            batch_size=self.opt.eval_batch_size,
-                            num_workers=self.opt.num_threads)
+            mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
+                                       table_path=self.opt.table_path,
+                                       data_dir=self.opt.cityscapes_path,
+                                       batch_size=self.opt.eval_batch_size,
+                                       num_workers=self.opt.num_threads, tqdm_position=2)
             if mIoU > self.best_mIoU:
                 self.is_best = True
                 self.best_mIoU = mIoU

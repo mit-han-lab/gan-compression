@@ -11,7 +11,7 @@ from configs import decode_config
 from configs.resnet_configs import get_configs
 from configs.single_configs import SingleConfigs
 from distillers.base_resnet_distiller import BaseResnetDistiller
-from metric import get_fid, get_mIoU
+from metric import get_fid, get_cityscapes_mIoU
 from models.modules.super_modules import SuperConv2d
 from utils import util
 from utils.weight_transfer import load_pretrained_weight
@@ -107,14 +107,14 @@ class ResnetSupernet(BaseResnetDistiller):
         os.makedirs(save_dir, exist_ok=True)
         self.netG_student.eval()
         if self.opt.eval_mode == 'both':
-            setting = ('largest', 'smallest')
+            settings = ('largest', 'smallest')
         else:
-            setting = (self.opt.eval_mode,)
-        for config_name in setting:
+            settings = (self.opt.eval_mode,)
+        for config_name in settings:
             config = self.configs(config_name)
             fakes, names = [], []
             cnt = 0
-            for i, data_i in enumerate(tqdm(self.eval_dataloader)):
+            for i, data_i in enumerate(tqdm(self.eval_dataloader, desc='Eval       ', position=2, leave=False)):
                 if self.opt.dataset_mode == 'aligned':
                     self.set_input(data_i)
                 else:
@@ -138,8 +138,8 @@ class ResnetSupernet(BaseResnetDistiller):
                             util.save_image(input_im, os.path.join(save_dir, 'input', '%s.png') % name, create_dir=True)
                     cnt += 1
 
-            fid = get_fid(fakes, self.inception_model, self.npz,
-                          device=self.device, batch_size=self.opt.eval_batch_size)
+            fid = get_fid(fakes, self.inception_model, self.npz, device=self.device,
+                          batch_size=self.opt.eval_batch_size, tqdm_position=2)
             if fid < getattr(self, 'best_fid_%s' % config_name):
                 self.is_best = True
                 setattr(self, 'best_fid_%s' % config_name, fid)
@@ -154,11 +154,11 @@ class ResnetSupernet(BaseResnetDistiller):
             ret['metric/fid_%s-best' % config_name] = getattr(self, 'best_fid_%s' % config_name)
 
             if 'cityscapes' in self.opt.dataroot:
-                mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
+                mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
                                            table_path=self.opt.table_path,
                                            data_dir=self.opt.cityscapes_path,
                                            batch_size=self.opt.eval_batch_size,
-                                           num_workers=self.opt.num_threads)
+                                           num_workers=self.opt.num_threads, tqdm_position=2)
                 if mIoU > getattr(self, 'best_mIoU_%s' % config_name):
                     self.is_best = True
                     setattr(self, 'best_mIoU_%s' % config_name, mIoU)

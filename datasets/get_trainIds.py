@@ -87,17 +87,17 @@ labels = [
 def label2id(image):
     array = np.array(image)
     out_array = np.empty(array.shape, dtype=array.dtype)
-    for l in labels:
-        if 0 <= l.trainId < 255:
-            out_array[array == l.trainId] = l.id
+    for label in labels:
+        if 0 <= label.trainId < 255:
+            out_array[array == label.trainId] = label.id
     return Image.fromarray(out_array)
 
 
 def id2label(image):
     array = np.array(image)
     out_array = np.empty(array.shape, dtype=array.dtype)
-    for l in labels:
-        out_array[array == l.id] = l.trainId
+    for label in labels:
+        out_array[array == label.id] = label.trainId
     return Image.fromarray(out_array)
 
 

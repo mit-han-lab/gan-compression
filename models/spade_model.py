@@ -10,9 +10,9 @@ from tqdm import tqdm
 
 from data import create_eval_dataloader
 from data import create_train_dataloader
-from metric import get_fid, get_mIoU
+from metric import get_fid, get_cityscapes_mIoU
+from metric.cityscapes_mIoU import DRNSeg
 from metric.fid_score import InceptionV3
-from metric.mIoU_score import DRNSeg
 from models import networks
 from models.base_model import BaseModel
 from models.modules.spade_modules.spade_model_modules import SPADEModelModules
@@ -183,7 +183,7 @@ class SPADEModel(BaseModel):
         fakes, names = [], []
         ret = {}
         cnt = 0
-        for i, data_i in enumerate(tqdm(self.eval_dataloader)):
+        for i, data_i in enumerate(tqdm(self.eval_dataloader, desc='Eval       ', position=2, leave=False)):
             self.set_input(data_i)
             self.test()
             fakes.append(self.fake_B.cpu())
@@ -200,8 +200,8 @@ class SPADEModel(BaseModel):
                     util.save_image(fake_im, os.path.join(save_dir, 'fake', '%s.png' % name), create_dir=True)
                 cnt += 1
         if not self.opt.no_fid:
-            fid = get_fid(fakes, self.inception_model, self.npz,
-                          device=self.device, batch_size=self.opt.eval_batch_size)
+            fid = get_fid(fakes, self.inception_model, self.npz, device=self.device,
+                          batch_size=self.opt.eval_batch_size, tqdm_position=2)
             if fid < self.best_fid:
                 self.is_best = True
                 self.best_fid = fid
@@ -212,11 +212,11 @@ class SPADEModel(BaseModel):
             ret['metric/fid-mean'] = sum(self.fids) / len(self.fids)
             ret['metric/fid-best'] = self.best_fid
         if 'cityscapes' in self.opt.dataroot and not self.opt.no_mIoU:
-            mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                            table_path=self.opt.table_path,
-                            data_dir=self.opt.cityscapes_path,
-                            batch_size=self.opt.eval_batch_size,
-                            num_workers=self.opt.num_threads)
+            mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
+                                       table_path=self.opt.table_path,
+                                       data_dir=self.opt.cityscapes_path,
+                                       batch_size=self.opt.eval_batch_size,
+                                       num_workers=self.opt.num_threads, tqdm_position=2)
             if mIoU > self.best_mIoU:
                 self.is_best = True
                 self.best_mIoU = mIoU
@@ -249,6 +249,18 @@ class SPADEModel(BaseModel):
 
     def load_networks(self, verbose=True):
         self.modules_on_one_gpu.load_networks(verbose)
+        if self.isTrain and self.opt.restore_O_path is not None:
+            for i, optimizer in enumerate(self.optimizers):
+                path = '%s-%d.pth' % (self.opt.restore_O_path, i)
+                util.load_optimizer(optimizer, path, verbose)
+            if self.opt.no_TTUR:
+                G_lr, D_lr = self.opt.lr, self.opt.lr
+            else:
+                G_lr, D_lr = self.opt.lr / 2, self.opt.lr * 2
+            for param_group in self.optimizer_G.param_groups:
+                param_group['lr'] = G_lr
+            for param_group in self.optimizer_D.param_groups:
+                param_group['lr'] = D_lr
 
     def get_current_visuals(self):
         """Return visualization images. train.py will display these images with visdom, and save the images to a HTML"""
@@ -260,6 +272,10 @@ class SPADEModel(BaseModel):
 
     def save_networks(self, epoch):
         self.modules_on_one_gpu.save_networks(epoch, self.save_dir)
+        for i, optimizer in enumerate(self.optimizers):
+            save_filename = '%s_optim-%d.pth' % (epoch, i)
+            save_path = os.path.join(self.save_dir, save_filename)
+            torch.save(optimizer.state_dict(), save_path)
 
     def calibrate(self, config):
         self.modules_on_one_gpu.netG.train()

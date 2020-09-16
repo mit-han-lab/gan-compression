@@ -29,7 +29,7 @@ class SPADEConfigs:
             ret['channels'].append(min(n_channel))
         return ret
 
-    def all_configs(self, split=1, remainder=0):
+    def all_configs(self):
 
         def yield_channels(i):
             if i == len(self.n_channels):
@@ -40,8 +40,7 @@ class SPADEConfigs:
                     yield [n] + after_channels
 
         for i, channels in enumerate(yield_channels(0)):
-            if i % split == remainder:
-                yield {'channels': channels}
+            yield {'channels': channels}
 
     def __call__(self, name):
         assert name in ('largest', 'smallest')
@@ -64,8 +63,33 @@ def get_configs(config_name):
         return SPADEConfigs(n_channels=[[48, 40, 32],
                                         [48, 40, 32], [48, 40, 32], [48, 40, 32], [48, 40, 32],
                                         [48, 40, 32, 24], [48, 40, 32, 24], [48, 40, 32, 24]])
-    if config_name == 'channels-64':
+    elif config_name == 'channels-48-stage1':
+        return SPADEConfigs(n_channels=[[48, 40],
+                                        [48, 40], [48, 40], [48, 40], [48, 40],
+                                        [48, 40], [48, 40], [48, 40]])
+    elif config_name == 'channels-64-stage1':
+        return SPADEConfigs(n_channels=[[64, 48],
+                                        [64, 48], [64, 48], [64, 48], [64, 48],
+                                        [64, 48, 40], [64, 48, 40], [64, 48, 40]])
+    elif config_name == 'channels-64':
         return SPADEConfigs(n_channels=[[64, 48, 40, 32],
                                         [64, 48, 40, 32], [64, 48, 40, 32], [64, 48, 40, 32], [64, 48, 40, 32],
                                         [64, 48, 40, 32, 24], [64, 48, 40, 32, 24], [64, 48, 40, 32, 24]])
+    elif config_name == 'channels-64-coco':
+        return SPADEConfigs(n_channels=[[64, 48, 40, 32, 24], [64, 48, 40, 32, 24],
+                                        [64, 48, 40, 32, 24], [64, 48, 40, 32, 24], [64, 48, 40, 32, 24],
+                                        [64, 48, 40, 32, 24], [64, 48, 40, 32, 24], [64, 48, 40, 32, 24]])
+    elif config_name == 'smallest':
+        return SPADEConfigs(n_channels=[[24],
+                                        [24], [24], [24], [24],
+                                        [24], [24], [24]])
+    elif config_name == 'middle':
+        return SPADEConfigs(n_channels=[[48],
+                                        [48], [48], [48], [48],
+                                        [40], [40], [40]])
+    elif config_name == 'debug':
+        return SPADEConfigs(n_channels=[[48],
+                                        [48], [48], [48], [48],
+                                        [48], [48], [48]])
+
     raise NotImplementedError('Unknown configuration [%s]!!!' % config_name)

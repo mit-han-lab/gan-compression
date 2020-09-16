@@ -49,6 +49,7 @@ class SPADEModelModules(nn.Module):
         return optimizer_G, optimizer_D
 
     def forward(self, input_semantics, real_B=None, mode='generate_fake'):
+
         if self.config is not None:
             self.netG.config = self.config
         if mode == 'generate_fake':

@@ -3,10 +3,10 @@ import importlib
 
 def find_supernet_using_name(supernet_name):
     supernet_filename = "supernets." + supernet_name + '_supernet'
-    modellib = importlib.import_module(supernet_filename)
+    supernetlib = importlib.import_module(supernet_filename)
     supernet = None
     target_supernet_name = supernet_name.replace('_', '') + 'supernet'
-    for name, cls in modellib.__dict__.items():
+    for name, cls in supernetlib.__dict__.items():
         if name.lower() == target_supernet_name.lower():
             supernet = cls
 

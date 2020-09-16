@@ -6,7 +6,7 @@ import torch
 
 from data import create_eval_dataloader
 from metric.fid_score import InceptionV3
-from metric.mIoU_score import DRNSeg
+from metric.cityscapes_mIoU import DRNSeg
 from models.modules.spade_modules.spade_distiller_modules import SPADEDistillerModules
 from models.modules.spade_modules.spade_supernet_modules import SPADESupernetModules
 from models.modules.sync_batchnorm import DataParallelWithCallback
@@ -118,8 +118,14 @@ class BaseSPADEDistiller(SPADEModel):
             for i, optimizer in enumerate(self.optimizers):
                 path = '%s-%d.pth' % (self.opt.restore_O_path, i)
                 util.load_optimizer(optimizer, path, verbose)
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] = self.opt.lr
+        if self.opt.no_TTUR:
+            G_lr, D_lr = self.opt.lr, self.opt.lr
+        else:
+            G_lr, D_lr = self.opt.lr / 2, self.opt.lr * 2
+        for param_group in self.optimizer_G.param_groups:
+            param_group['lr'] = G_lr
+        for param_group in self.optimizer_D.param_groups:
+            param_group['lr'] = D_lr
 
     def save_networks(self, epoch):
         self.modules_on_one_gpu.save_networks(epoch, self.save_dir)

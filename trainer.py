@@ -7,6 +7,7 @@ import warnings
 import numpy as np
 import torch
 from torch.backends import cudnn
+from tqdm import tqdm, trange
 
 from data import create_dataloader
 from utils.logger import Logger
@@ -74,10 +75,13 @@ class Trainer:
         start_epoch = opt.epoch_base
         end_epoch = opt.epoch_base + opt.nepochs + opt.nepochs_decay - 1
         total_iter = opt.iter_base
-        for epoch in range(start_epoch, end_epoch + 1):
+        epoch_tqdm = trange(start_epoch, end_epoch + 1, desc='Epoch      ', position=0, leave=False)
+        self.logger.set_progress_bar(epoch_tqdm)
+        for epoch in epoch_tqdm:
             epoch_start_time = time.time()  # timer for entire epoch
-            for i, data_i in enumerate(dataloader):
+            for i, data_i in enumerate(tqdm(dataloader, desc='Batch      ', position=1, leave=False)):
                 iter_start_time = time.time()
+                total_iter += 1
                 model.set_input(data_i)
                 model.optimize_parameters(total_iter)
 
@@ -86,13 +90,12 @@ class Trainer:
                     logger.print_current_errors(epoch, total_iter, losses, time.time() - iter_start_time)
                     logger.plot(losses, total_iter)
 
-                if total_iter % opt.save_latest_freq == 0 or total_iter == opt.iter_base:
+                if total_iter % opt.save_latest_freq == 0:
                     self.evaluate(epoch, total_iter,
                                   'Saving the latest model (epoch %d, total_steps %d)' % (epoch, total_iter))
                     if model.is_best:
                         model.save_networks('iter%d' % total_iter)
 
-                total_iter += 1
             logger.print_info(
                 'End of epoch %d / %d \t Time Taken: %.2f sec' % (epoch, end_epoch, time.time() - epoch_start_time))
             if epoch % opt.save_epoch_freq == 0 or epoch == end_epoch:

@@ -194,19 +194,19 @@ def resize_4d_tensor(tensor, width, height):
 
 
 def test(fakes, names, model, device, table_path='datasets/table.txt', data_dir='database/cityscapes',
-         batch_size=1, num_workers=8, num_classes=19, use_tqdm=True):
+         batch_size=1, num_workers=8, num_classes=19, tqdm_position=None):
     dataset = SegList(fakes, names, table_path, data_dir)
     eval_dataloader = DataLoader(dataset, batch_size=batch_size,
                                  shuffle=False, num_workers=num_workers)
     model.eval()
     hist = np.zeros((num_classes, num_classes))
-    if use_tqdm:
-        from tqdm import tqdm
+    if tqdm_position:
+        import tqdm
+        dataloader_tqdm = tqdm.tqdm(eval_dataloader, desc='mIoU       ', position=tqdm_position, leave=False)
     else:
-        def tqdm(x):
-            return x
+        dataloader_tqdm = eval_dataloader
     with torch.no_grad():
-        for iter, (image, label) in enumerate(tqdm(eval_dataloader)):
+        for image, label in dataloader_tqdm:
             image = image.to(device)
             final = model(image)[0]
             final = resize_4d_tensor(final, 2048, 1024)

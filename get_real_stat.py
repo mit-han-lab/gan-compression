@@ -5,6 +5,7 @@ import numpy as np
 import torch
 import tqdm
 
+import data
 from data import create_dataloader
 from metric.fid_score import _compute_statistics_of_ims
 from metric.inception import InceptionV3
@@ -22,11 +23,14 @@ def main(opt):
 
     tensors = []
     for i, data_i in enumerate(tqdm.tqdm(dataloader)):
-        tensor = data_i[opt.direction[-1]]
+        if opt.dataset_mode in ['single', 'aligned']:
+            tensor = data_i[opt.direction[-1]]
+        else:
+            tensor = data_i['image']
         tensors.append(tensor)
     tensors = torch.cat(tensors, dim=0)
     tensors = util.tensor2im(tensors).astype(float)
-    mu, sigma = _compute_statistics_of_ims(tensors, inception_model, 32, 2048, device, use_tqdm=True)
+    mu, sigma = _compute_statistics_of_ims(tensors, inception_model, 32, 2048, device)
     np.savez(opt.output_path, mu=mu, sigma=sigma)
 
 
@@ -36,19 +40,24 @@ if __name__ == '__main__':
                         help='# of input image channels: 3 for RGB and 1 for grayscale')
     parser.add_argument('--output_nc', type=int, default=3,
                         help='# of output image channels: 3 for RGB and 1 for grayscale')
-    parser.add_argument('--dataroot', required=True,
-                        help='path to images (should have subfolders trainA, trainB, valA, valB, train, val, etc)')
+    parser.add_argument('--dataroot', required=True, help='path to images')
     parser.add_argument('--dataset_mode', type=str, default='aligned',
-                        help='chooses how datasets are loaded. [aligned | single]')
+                        choices=['aligned', 'single', 'cityscapes', 'coco'],
+                        help='chooses how datasets are loaded.')
     parser.add_argument('--direction', type=str, default='AtoB', help='AtoB or BtoA')
     parser.add_argument('--load_size', type=int, default=256, help='scale images to this size')
     parser.add_argument('--crop_size', type=int, default=256, help='then crop to this size')
     parser.add_argument('--preprocess', type=str, default='none', help='scaling and cropping of images at load time '
-                             '[resize_and_crop | crop | scale_width | scale_width_and_crop | none]')
+                                                                       '[resize_and_crop | crop | scale_width | scale_width_and_crop | none]')
     parser.add_argument('--phase', type=str, default='val', help='train, val, test, etc')
     parser.add_argument('--output_path', type=str, required=True,
                         help='the path to save the statistical information.')
     parser.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2. use -1 for CPU')
+
+    opt, _ = parser.parse_known_args()
+    dataset_name = opt.dataset_mode
+    dataset_option_setter = data.get_option_setter(dataset_name)
+    parser = dataset_option_setter(parser, False)
 
     opt = parser.parse_args()
     opt.num_threads = 0
@@ -57,6 +66,7 @@ if __name__ == '__main__':
     opt.no_flip = True
     opt.max_dataset_size = -1
     opt.load_in_memory = False
+    opt.isTrain = False
     if opt.dataset_mode == 'single' and opt.direction == 'AtoB':
         warnings.warn('Dataset mode [single] only supports direction BtoA. '
                       'We will change the direction to BtoA.!')

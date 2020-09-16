@@ -2,15 +2,22 @@ import random
 
 
 class ResnetConfigs:
-    def __init__(self, n_channels):
+    def __init__(self, n_channels, weights=None):
         self.attributes = ['n_channels']
         self.n_channels = n_channels
+        self.weights = weights
 
     def sample(self):
         ret = {}
         ret['channels'] = []
-        for n_channel in self.n_channels:
-            ret['channels'].append(random.choice(n_channel))
+        if self.weights is None:
+            for n_channel in self.n_channels:
+                ret['channels'].append(random.choice(n_channel))
+        else:
+            assert len(self.n_channels) == len(self.weights)
+            for n_channel, weight in zip(self.n_channels, self.weights):
+                assert len(n_channel) == len(weight)
+                ret['channels'].append(random.choices(n_channel, weights=weight)[0])
         return ret
 
     def largest(self):
@@ -27,7 +34,7 @@ class ResnetConfigs:
             ret['channels'].append(min(n_channel))
         return ret
 
-    def all_configs(self, split=1, remainder=0):
+    def all_configs(self):
 
         def yield_channels(i):
             if i == len(self.n_channels):
@@ -38,8 +45,7 @@ class ResnetConfigs:
                     yield [n] + after_channels
 
         for i, channels in enumerate(yield_channels(0)):
-            if i % split == remainder:
-                yield {'channels': channels}
+            yield {'channels': channels}
 
     def __call__(self, name):
         assert name in ('largest', 'smallest')
@@ -79,5 +85,9 @@ def get_configs(config_name):
         return ResnetConfigs(n_channels=[[64, 48, 32], [64, 48, 32], [64, 48, 40, 32],
                                          [64, 48, 40, 32], [64, 48, 40, 32], [64, 48, 40, 32],
                                          [64, 48, 32, 24, 16], [64, 48, 32, 24, 16]])
+    elif config_name == 'test':
+        return ResnetConfigs(n_channels=[[8], [6, 8], [6, 8],
+                                         [8], [8], [8],
+                                         [8], [8]])
     else:
         raise NotImplementedError('Unknown configuration [%s]!!!' % config_name)

@@ -27,10 +27,10 @@ class SPADEResnetBlock(nn.Module):
 
         # define normalization layers
         spade_config_str = opt.norm_G.replace('spectral', '')
-        self.norm_0 = SPADE(spade_config_str, fin, opt.semantic_nc)
-        self.norm_1 = SPADE(spade_config_str, fmiddle, opt.semantic_nc)
+        self.norm_0 = SPADE(spade_config_str, fin, opt.semantic_nc, nhidden=opt.ngf * 2)
+        self.norm_1 = SPADE(spade_config_str, fmiddle, opt.semantic_nc, nhidden=opt.ngf * 2)
         if self.learned_shortcut:
-            self.norm_s = SPADE(spade_config_str, fin, opt.semantic_nc)
+            self.norm_s = SPADE(spade_config_str, fin, opt.semantic_nc, nhidden=opt.ngf * 2)
 
     # note the resnet block with SPADE also takes in |seg|,
     # the semantic segmentation map as input
@@ -111,51 +111,68 @@ class SPADEGenerator(BaseNetwork):
 
         return sw, sh
 
-    def forward(self, input, z=None):
+    def forward(self, input, mapping_layers=[]):
         seg = input
+        ret_acts = {}
 
         # we downsample segmap and run convolution
         x = F.interpolate(seg, size=(self.sh, self.sw))
         x = self.fc(x)
-
+        if 'fc' in mapping_layers:
+            ret_acts['fc'] = x
         x = self.head_0(x, seg)
-
+        if 'head_0' in mapping_layers:
+            ret_acts['head_0'] = x
         x = self.up(x)
         x = self.G_middle_0(x, seg)
-
+        if 'G_middle_0' in mapping_layers:
+            ret_acts['G_middle_0'] = x
         if self.opt.num_upsampling_layers == 'more' or \
                 self.opt.num_upsampling_layers == 'most':
             x = self.up(x)
 
         x = self.G_middle_1(x, seg)
-
+        if 'G_middle_1' in mapping_layers:
+            ret_acts['G_middle_1'] = x
         x = self.up(x)
         x = self.up_0(x, seg)
+        if 'up_0' in mapping_layers:
+            ret_acts['up_0'] = x
         x = self.up(x)
         x = self.up_1(x, seg)
+        if 'up_1' in mapping_layers:
+            ret_acts['up_1'] = x
         x = self.up(x)
         x = self.up_2(x, seg)
+        if 'up_2' in mapping_layers:
+            ret_acts['up_2'] = x
         x = self.up(x)
         x = self.up_3(x, seg)
-
+        if 'up_3' in mapping_layers:
+            ret_acts['up_3'] = x
         if self.opt.num_upsampling_layers == 'most':
             x = self.up(x)
             x = self.up_4(x, seg)
+            if 'up_4' in mapping_layers:
+                ret_acts['up_4'] = x
 
         x = self.conv_img(F.leaky_relu(x, 2e-1))
         x = F.tanh(x)
 
-        return x
+        if len(mapping_layers) == 0:
+            return x
+        else:
+            return x, ret_acts
 
     def remove_spectral_norm(self):
-        x = self.head_0.remove_spectral_norm()
-        x = self.G_middle_0.remove_spectral_norm()
-        x = self.G_middle_1.remove_spectral_norm()
+        self.head_0.remove_spectral_norm()
+        self.G_middle_0.remove_spectral_norm()
+        self.G_middle_1.remove_spectral_norm()
 
-        x = self.up_0.remove_spectral_norm()
-        x = self.up_1.remove_spectral_norm()
-        x = self.up_2.remove_spectral_norm()
-        x = self.up_3.remove_spectral_norm()
+        self.up_0.remove_spectral_norm()
+        self.up_1.remove_spectral_norm()
+        self.up_2.remove_spectral_norm()
+        self.up_3.remove_spectral_norm()
 
         if self.opt.num_upsampling_layers == 'most':
-            x = self.up_4.remove_spectral_norm()
+            self.up_4.remove_spectral_norm()

@@ -74,10 +74,6 @@ def create_train_dataloader(opt, direction=None):
     opt.phase = 'train'
     opt.load_in_memory = False
     opt.max_dataset_size = 256
-    if opt.dataset_mode == 'unaligned':
-        assert direction is not None
-        opt.dataset_mode = 'single'
-        opt.dataroot = os.path.join(opt.dataroot, 'val%s' % (direction[0]))
     dataloader = CustomDatasetDataLoader(opt)
     dataloader = dataloader.load_data()
     return dataloader

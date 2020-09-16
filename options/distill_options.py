@@ -32,7 +32,7 @@ class DistillOptions(BaseOptions):
                             help='frequency of saving checkpoints at the end of epoch')
         parser.add_argument('--epoch_base', type=int, default=1,
                             help='the epoch base of the training (used for resuming)')
-        parser.add_argument('--iter_base', type=int, default=1,
+        parser.add_argument('--iter_base', type=int, default=0,
                             help='the iteration base of the training (used for resuming)')
 
         # model parameters

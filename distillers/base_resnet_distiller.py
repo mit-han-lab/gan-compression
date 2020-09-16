@@ -8,8 +8,7 @@ from torch.nn import DataParallel
 
 import models.modules.loss
 from data import create_eval_dataloader
-from metric.inception import InceptionV3
-from metric.mIoU_score import DRNSeg
+from metric import create_metric_models
 from models import networks
 from models.base_model import BaseModel
 from models.modules.super_modules import SuperConv2d
@@ -131,20 +130,7 @@ class BaseResnetDistiller(BaseModel):
         self.optimizers.append(self.optimizer_D)
 
         self.eval_dataloader = create_eval_dataloader(self.opt, direction=opt.direction)
-
-        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
-        self.inception_model = InceptionV3([block_idx])
-        self.inception_model.to(self.device)
-        self.inception_model.eval()
-
-        if 'cityscapes' in opt.dataroot:
-            self.drn_model = DRNSeg('drn_d_105', 19, pretrained=False)
-            util.load_network(self.drn_model, opt.drn_path, verbose=False)
-            if len(opt.gpu_ids) > 0:
-                self.drn_model.to(self.device)
-                self.drn_model = nn.DataParallel(self.drn_model, opt.gpu_ids)
-            self.drn_model.eval()
-
+        self.inception_model, self.drn_model, de = create_metric_models(opt, device=self.device)
         self.npz = np.load(opt.real_stat_path)
         self.is_best = False
 

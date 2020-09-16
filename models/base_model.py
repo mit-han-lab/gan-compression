@@ -8,6 +8,7 @@ from utils import util
 from . import networks
 from torch.nn import DataParallel
 
+
 class BaseModel(ABC):
     """This class is an abstract base class (ABC) for models.
     To create a subclass, you need to implement the following five functions:

@@ -183,14 +183,14 @@ class MobileSPADEGenerator(BaseNetwork):
             return x, ret_acts
 
     def remove_spectral_norm(self):
-        x = self.head_0.remove_spectral_norm()
-        x = self.G_middle_0.remove_spectral_norm()
-        x = self.G_middle_1.remove_spectral_norm()
+        self.head_0.remove_spectral_norm()
+        self.G_middle_0.remove_spectral_norm()
+        self.G_middle_1.remove_spectral_norm()
 
-        x = self.up_0.remove_spectral_norm()
-        x = self.up_1.remove_spectral_norm()
-        x = self.up_2.remove_spectral_norm()
-        x = self.up_3.remove_spectral_norm()
+        self.up_0.remove_spectral_norm()
+        self.up_1.remove_spectral_norm()
+        self.up_2.remove_spectral_norm()
+        self.up_3.remove_spectral_norm()
 
         if self.opt.num_upsampling_layers == 'most':
-            x = self.up_4.remove_spectral_norm()
+            self.up_4.remove_spectral_norm()

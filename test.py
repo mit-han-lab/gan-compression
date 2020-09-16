@@ -1,17 +1,19 @@
+import copy
 import ntpath
 import os
 import sys
 import warnings
 
 import numpy as np
+import torch
 import tqdm
-from torch import nn
 
 from configs import decode_config
 from data import create_dataloader
-from metric import get_mIoU, get_fid
-from metric.inception import InceptionV3
-from metric.mIoU_score import DRNSeg
+from metric import create_metric_models
+from metric import get_cityscapes_mIoU
+from metric import get_coco_scores
+from metric import get_fid
 from models import create_model
 from options.test_options import TestOptions
 from utils import html, util
@@ -95,26 +97,25 @@ if __name__ == '__main__':
         if i < opt.num_test:
             save_images(webpage, visuals, model.get_image_paths(), opt)
     webpage.save()  # save the HTML
-    device = model.device
+    device = copy.deepcopy(model.device)
+    del model
+    torch.cuda.empty_cache()
 
-    if 'cityscapes' in opt.dataroot and not opt.no_mIoU and opt.direction == 'BtoA':
-        drn_model = DRNSeg('drn_d_105', 19, pretrained=False)
-        util.load_network(drn_model, opt.drn_path, verbose=False)
-        if len(opt.gpu_ids) > 0:
-            drn_model = nn.DataParallel(drn_model, opt.gpu_ids)
-        drn_model.eval()
-        mIoU = get_mIoU(fakes, names, drn_model, device,
-                        data_dir=opt.cityscapes_path,
-                        batch_size=opt.batch_size,
-                        num_workers=opt.num_threads)
-        print('mIoU: %.2f' % mIoU)
-
-    if not opt.no_fid:
-        print('Calculating FID...', flush=True)
-        block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
-        inception_model = InceptionV3([block_idx])
-        inception_model.to(device)
-        inception_model.eval()
+    inception_model, drn_model, deeplabv2_model = create_metric_models(opt, device)
+    if inception_model is not None:
         npz = np.load(opt.real_stat_path)
         fid = get_fid(fakes, inception_model, npz, device, opt.batch_size)
         print('fid score: %.2f' % fid, flush=True)
+
+    if drn_model is not None:
+        mIoU = get_cityscapes_mIoU(fakes, names, drn_model, device,
+                                   data_dir=opt.cityscapes_path,
+                                   batch_size=opt.batch_size,
+                                   num_workers=opt.num_threads)
+        print('mIoU: %.2f' % mIoU)
+
+    if deeplabv2_model is not None:
+        accu, mIoU = get_coco_scores(fakes, names, deeplabv2_model,
+                                     device, opt.dataroot, opt.batch_size,
+                                     num_workers=0)
+        print('accu: %.2f\tmIoU: %.2f' % (accu, mIoU))

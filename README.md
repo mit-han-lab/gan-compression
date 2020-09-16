@@ -1,5 +1,6 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [videos](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex) | [slides](https://hanlab.mit.edu/projects/gancompression/resources/546-slides.pdf) 
+**[NEW!]** New features: searching resuming and more user-friendly progress bar during training and searching! Update the [docs of the code](docs/overview.md)! The lite version of [cityscapes for pix2pix](scripts/pix2pix/cityscapes_lite) is released!
 
 **[NEW!]** The lite version of [GauGAN](scripts/gaugan/cityscapes_lite) is released, which could also produce comparable results as the full GauGAN pipeline!
 
@@ -341,10 +342,10 @@ Here we show the performance of all our released models:
   </tr>
   <tr>
     <td>Lite Pipeline</td>
-    <td>NA</td>
-    <td>NA</td>
-    <td>NA</td>
-    <td>NA</td>
+    <td>0.867M</td>
+    <td>5.61G</td>
+    <td>65.23</td>
+    <td>39.09</td>
   </tr>
   <tr>
     <td rowspan="3">map→arial photo<br></td>
@@ -398,9 +399,6 @@ Here we show the performance of all our released models:
     <td>56.25</td>
     <td>61.17</td>
   </tr>
-</tbody>
-</table>
-
 
 ### Training
 
@@ -425,7 +423,7 @@ To help users better understand and use our code, we briefly overview the functi
 
 ## Citation
 
-If you use this code for your research, please cite our [paper](https://arxiv.org/abs/2003.08936).
+If you use this code for your research, please cite our [paper](https://arxiv.org/pdf/2003.08936).
 ```
 @inproceedings{li2020gan,
   title={GAN Compression: Efficient Architectures for Interactive Conditional GANs},
@@ -440,4 +438,4 @@ If you use this code for your research, please cite our [paper](https://arxiv.or
 
 Our code is developed based on [pytorch-CycleGAN-and-pix2pix](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) and [SPADE](https://github.com/NVlabs/SPADE).
 
-We also thank [pytorch-fid](https://github.com/mseitzer/pytorch-fid) for FID computation and [drn](https://github.com/fyu/drn) for mIoU computation.
+We also thank [pytorch-fid](https://github.com/mseitzer/pytorch-fid) for FID computation, [drn](https://github.com/fyu/drn) for cityscapes mIoU computation and [deeplabv2](https://github.com/kazuto1011/deeplab-pytorch) for Coco-Stuff mIoU computation.

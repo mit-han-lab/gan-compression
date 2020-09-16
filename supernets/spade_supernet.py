@@ -11,7 +11,7 @@ from configs.single_configs import SingleConfigs
 from configs.spade_configs import get_configs
 from data import create_dataloader
 from distillers.base_spade_distiller import BaseSPADEDistiller
-from metric import get_fid, get_mIoU
+from metric import get_fid, get_cityscapes_mIoU
 from models import networks
 from utils import util
 
@@ -63,18 +63,20 @@ class SPADESupernet(BaseSPADEDistiller):
         save_dir = os.path.join(self.opt.log_dir, 'eval', str(step))
         os.makedirs(save_dir, exist_ok=True)
         if self.opt.eval_mode == 'both':
-            setting = ('largest', 'smallest')
+            settings = ('largest', 'smallest')
         else:
-            setting = (self.opt.eval_mode,)
-        for config_name in setting:
+            settings = (self.opt.eval_mode,)
+        for config_name in settings:
             config = self.configs(config_name)
             fakes, names = [], []
-            cnt = 0
             self.modules_on_one_gpu.netG_student.train()
-            self.calibrate(config, use_tqdm=True)
+            self.calibrate(config, 2)
+            tqdm_position = 2 + int(not self.opt.no_calibration)
             self.modules_on_one_gpu.netG_student.eval()
             torch.cuda.empty_cache()
-            for i, data_i in enumerate(tqdm(self.eval_dataloader)):
+
+            cnt = 0
+            for i, data_i in enumerate(tqdm(self.eval_dataloader, desc='Eval       ', position=tqdm_position, leave=False)):
                 self.set_input(data_i)
                 self.test(config=config)
                 fakes.append(self.Sfake_B.cpu())
@@ -92,9 +94,10 @@ class SPADESupernet(BaseSPADEDistiller):
                         util.save_image(Tfake_im, os.path.join(save_dir, 'Tfake', '%s.png' % name), create_dir=True)
                         util.save_image(Sfake_im, os.path.join(save_dir, 'Sfake', '%s.png' % name), create_dir=True)
                     cnt += 1
+
             if not self.opt.no_fid:
-                fid = get_fid(fakes, self.inception_model, self.npz,
-                              device=self.device, batch_size=self.opt.eval_batch_size)
+                fid = get_fid(fakes, self.inception_model, self.npz, device=self.device,
+                              batch_size=self.opt.eval_batch_size, tqdm_position=2)
                 if fid < getattr(self, 'best_fid_%s' % config_name):
                     self.is_best = True
                     setattr(self, 'best_fid_%s' % config_name, fid)
@@ -107,11 +110,11 @@ class SPADESupernet(BaseSPADEDistiller):
                     getattr(self, 'fids_%s' % config_name))
                 ret['metric/fid_%s-best' % config_name] = getattr(self, 'best_fid_%s' % config_name)
             if 'cityscapes' in self.opt.dataroot and not self.opt.no_mIoU:
-                mIoU = get_mIoU(fakes, names, self.drn_model, self.device,
-                                table_path=self.opt.table_path,
-                                data_dir=self.opt.cityscapes_path,
-                                batch_size=self.opt.eval_batch_size,
-                                num_workers=self.opt.num_threads)
+                mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
+                                           table_path=self.opt.table_path,
+                                           data_dir=self.opt.cityscapes_path,
+                                           batch_size=self.opt.eval_batch_size,
+                                           num_workers=self.opt.num_threads, tqdm_position=2)
                 if mIoU > getattr(self, 'best_mIoU_%s' % config_name):
                     self.is_best = True
                     setattr(self, 'best_mIoU_%s' % config_name, mIoU)
@@ -128,16 +131,15 @@ class SPADESupernet(BaseSPADEDistiller):
         torch.cuda.empty_cache()
         return ret
 
-    def calibrate(self, config, use_tqdm=False):
+    def calibrate(self, config, tqdm_position=None):
         if self.opt.no_calibration:
             return
-        if use_tqdm:
-            from tqdm import tqdm
+        if tqdm_position is None or tqdm_position >= 0:
+            calibrate_tqdm = tqdm(self.train_dataloader, desc='Calibrate  ', position=tqdm_position, leave=False)
         else:
-            def tqdm(x):
-                return x
+            calibrate_tqdm = self.train_dataloader
         config = copy.deepcopy(config)
-        for i, data in enumerate(tqdm(self.train_dataloader)):
+        for i, data in enumerate(calibrate_tqdm):
             self.set_input(data)
             if i == 0:
                 config['calibrate_bn'] = True
