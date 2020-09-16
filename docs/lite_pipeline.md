@@ -72,7 +72,7 @@ such as
 
 `'config_str'` is a channel configuration description to identify a specific subnet within the "once-for-all" network.
 
-To accelerate the search process, you may need to want to search the sub-networks on multiple GPUs. You could manually split the search space with [search.py](../search.py). All you need to do is add additional arguments `--split` and `--remainder`. For example, if you need to search the sub-networks  with 2 GPUs, you could use the following commands:
+To accelerate the search process, you may need to want to search the sub-networks on multiple GPUs. You could manually split the search space with [search.py](../search.py). All you need to do is add additional arguments `--num_splits` and `--split`. For example, if you need to search the sub-networks  with 2 GPUs, you could use the following commands:
 
 * On the first GPU:
 
@@ -83,7 +83,7 @@ To accelerate the search process, you may need to want to search the sub-network
     --ngf 64 --batch_size 32 \
     --config_set channels-64-pix2pix \
     --real_stat_path real_stat/edges2shoes-r_B.npz --load_in_memory --budget 6.5e9 \
-    --split 2 --remainder 0
+    --num_splits 2 --split 0
   ```
 
 * On the second GPU:
@@ -95,7 +95,7 @@ To accelerate the search process, you may need to want to search the sub-network
     --ngf 64 --batch_size 32 \
     --config_set channels-64-pix2pix \
     --real_stat_path real_stat/edges2shoes-r_B.npz --load_in_memory --budget 6.5e9 \
-    --split 2 --remainder 1 --gpu_ids 1
+    --num_splits 2 --split 1 --gpu_ids 1
   ```
 
 Then you could merge the search results with [merge.py](../merge.py)
@@ -173,7 +173,7 @@ Evaluate all the candidate sub-networks given a specific configuration
 ```shell
 bash scripts/cycle_gan/horse2zebra_lite/search.sh
 ```
-To support multi-GPU search, you could manually split the search space with additional arguments `--split` and `--remainder` and merge them with [merge.py](../merge.py), which is the same as pix2pix.
+To support multi-GPU search, you could manually split the search space with additional arguments `--num_splits` and `--split` and merge them with [merge.py](../merge.py), which is the same as pix2pix.
 
 You could also use our auxiliary script [select_arch.py](../select_arch.py) to select the architecture you want. The usage is the same as pix2pix.
 
@@ -242,7 +242,7 @@ Evaluate all the candidate sub-networks given a specific configuration
 ```shell
 bash scripts/gaugan/cityscapes_lite/search.sh
 ```
-To support multi-GPU search, you could manually split the search space with additional arguments `--split` and `--remainder` and merge them with [merge.py](../merge.py), which is the same as pix2pix.
+To support multi-GPU search, you could manually split the search space with additional arguments `--num_splits` and `--split` and merge them with [merge.py](../merge.py), which is the same as pix2pix.
 
 You could also use our auxiliary script [select_arch.py](../select_arch.py) to select the architecture you want. The usage is the same as pix2pix.
 
