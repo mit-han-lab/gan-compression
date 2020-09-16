@@ -399,8 +399,8 @@ Here we show the performance of all our released models:
     <td>56.25</td>
     <td>61.17</td>
   </tr>
-
-
+</tbody>
+</table>
 
 ### Training
 
