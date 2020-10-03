@@ -402,16 +402,16 @@ Here we show the performance of all our released models:
   <tr>
     <td rowspan="2">Coco-Stuff</td>
     <td>Original</td>
-    <td>TBA</td>
-    <td>TBA</td>
+    <td>97.5M</td>
+    <td>191G</td>
     <td>21.38</td>
     <td>38.78</td>
   </tr>
   <tr>
     <td>Lite Pipeline</td>
-    <td>NA</td>
+    <td>26.0M</td>
     <td>35.5G</td>
-    <td>TBA</td>
+    <td>25.06</td>
     <td>35.05</td>
   </tr>
 </tbody>
