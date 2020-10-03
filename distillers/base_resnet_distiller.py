@@ -53,6 +53,9 @@ class BaseResnetDistiller(BaseModel):
                             help='weight for gan loss')
         parser.add_argument('--teacher_dropout_rate', type=float, default=0)
         parser.add_argument('--student_dropout_rate', type=float, default=0)
+        parser.add_argument('--no_fid', action='store_true', help='No FID evaluation during training')
+        parser.add_argument('--no_mIoU', action='store_true', help='No mIoU evaluation during training '
+                                                                   '(sometimes because there are CUDA memory)')
         return parser
 
     def __init__(self, opt):

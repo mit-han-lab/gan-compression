@@ -183,7 +183,7 @@ def get_activations_from_ims(ims, model, batch_size=50, dims=2048,
 
     if tqdm_position is None or tqdm_position >= 0:
         import tqdm
-        dataloader_tqdm = tqdm.trange(n_batches, desc='FID', position=tqdm_position, leave=False)
+        dataloader_tqdm = tqdm.trange(n_batches, desc='FID        ', position=tqdm_position, leave=False)
     else:
         dataloader_tqdm = range(n_batches)
     for i in dataloader_tqdm:

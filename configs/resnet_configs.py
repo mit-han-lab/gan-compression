@@ -7,18 +7,23 @@ class ResnetConfigs:
         self.n_channels = n_channels
         self.weights = weights
 
-    def sample(self):
+    def sample(self, weighted_sample=1):
         ret = {}
         ret['channels'] = []
-        if self.weights is None:
-            for n_channel in self.n_channels:
-                ret['channels'].append(random.choice(n_channel))
-        else:
-            assert len(self.n_channels) == len(self.weights)
-            for n_channel, weight in zip(self.n_channels, self.weights):
-                assert len(n_channel) == len(weight)
-                ret['channels'].append(random.choices(n_channel, weights=weight)[0])
+        for n_channel in self.n_channels:
+            if weighted_sample > 1.0001:
+                now = (len(n_channel) - 1) / (weighted_sample - 1)
+                weights = []
+                while len(weights) < len(n_channel):
+                    weights.append(now)
+                    now += 1
+            else:
+                weights = None
+            ret['channels'].append(random.choices(n_channel, weights=weights)[0])
         return ret
+
+    def sample_layer(self, layer):
+        return random.choice(self.n_channels[layer])
 
     def largest(self):
         ret = {}

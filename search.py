@@ -122,28 +122,24 @@ if __name__ == '__main__':
                     short_path = ntpath.basename(path)
                     name = os.path.splitext(short_path)[0]
                     names.append(name)
-        tqdm_position = 1
         if inception_model is not None:
             if qualified:
                 result['fid'] = get_fid(fakes, inception_model, npz, device, opt.batch_size,
-                                        tqdm_position=tqdm_position)
-                tqdm_position += 1
+                                        tqdm_position=1)
             else:
                 result['fid'] = 1e9
         if drn_model is not None:
             if qualified:
                 result['mIoU'] = get_cityscapes_mIoU(fakes, names, drn_model, device, data_dir=opt.cityscapes_path,
                                                      batch_size=opt.batch_size, num_workers=opt.num_threads,
-                                                     tqdm_position=tqdm_position)
-                tqdm_position += 1
+                                                     tqdm_position=1)
             else:
                 result['mIoU'] = 0
         if deeplabv2_model is not None:
             if qualified:
                 torch.cuda.empty_cache()
                 result['accu'], result['mIoU'] = get_coco_scores(fakes, names, deeplabv2_model, device, opt.dataroot, 1,
-                                                                 num_workers=0, tqdm_position=tqdm_position)
-                tqdm_position += 1
+                                                                 num_workers=0, tqdm_position=1)
             else:
                 result['accu'], result['mIoU'] = 0, 0
         results.append(result)

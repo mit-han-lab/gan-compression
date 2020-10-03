@@ -6,12 +6,12 @@ import wget
 
 def check(opt):
     if opt.model == 'pix2pix':
-        assert opt.task in ['edges2shoes-r', 'map2sat', 'cityscapes',
-                            'edges2shoes-r_lite', 'map2sat_lite', 'legacy']
+        assert opt.task in ['edges2shoes-r', 'map2sat', 'cityscapes', 'cityscapes_lite',
+                            'edges2shoes-r_lite', 'map2sat_lite']
     elif opt.model == 'cycle_gan':
-        assert opt.task in ['horse2zebra', 'horse2zebra_lite', 'legacy']
+        assert opt.task in ['horse2zebra', 'horse2zebra_lite']
     elif opt.model == 'gaugan':
-        assert opt.task in ['cityscapes', 'cityscapes_lite', 'legacy']
+        assert opt.task in ['cityscapes', 'cityscapes_lite', 'coco_lite']
     else:
         raise NotImplementedError('Unsupported model [%s]!' % opt.model)
 
@@ -26,7 +26,8 @@ def download(path):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Download a pretrained model.')
     parser.add_argument('--stage', type=str, default='compressed',
-                        choices=['full', 'mobile', 'distill', 'supernet', 'finetune', 'compressed', 'legacy'],
+                        choices=['full', 'mobile', 'distill', 'supernet',
+                                 'finetune', 'compressed', 'legacy'],
                         help='specify the stage you want to download')
     parser.add_argument('--model', type=str, default='pix2pix',
                         choices=['pix2pix', 'cycle_gan', 'gaugan'],

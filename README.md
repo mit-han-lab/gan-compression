@@ -1,5 +1,7 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [videos](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex) | [slides](https://hanlab.mit.edu/projects/gancompression/resources/546-slides.pdf) 
+**[NEW!]** GauGAN models on [Coco-stuff](scripts/gaugan/coco_lite) are released! Support evolution search, which is much faster than the previous one! Please refer to our [lite pipeline](docs/lite_pipeline.md)!
+
 **[NEW!]** New features: searching resuming and more user-friendly progress bar during training and searching! Update the [docs of the code](docs/overview.md)! The lite version of [cityscapes for pix2pix](scripts/pix2pix/cityscapes_lite) is released!
 
 **[NEW!]** The lite version of [GauGAN](scripts/gaugan/cityscapes_lite) is released, which could also produce comparable results as the full GauGAN pipeline!
@@ -9,8 +11,6 @@
 **[NEW!]** The lite pipeline (GAN Compression Lite) is released! Check the [tutorial](docs/lite_pipeline.md) for the pipeline.
 
 **[NEW!]** GauGAN training code and tutorial is released! Check the [tutorial](docs/training_tutorial.md) to compress GauGAN.
-
-**[NEW!]** Correct metric naming and update the evaluation protocol. Support MACs budget for searching.
 
 ![teaser](imgs/teaser.png)
 *We introduce GAN Compression, a general-purpose method for compressing conditional GANs. Our method reduces the computation of widely-used conditional GAN models, including pix2pix, CycleGAN, and GauGAN, by 9-21x while preserving the visual fidelity. Our method is effective for a wide range of generator architectures, learning objectives, and both paired and unpaired settings.*
@@ -370,7 +370,7 @@ Here we show the performance of all our released models:
     <td>--</td>
   </tr>
   <tr>
-    <td rowspan="4">GauGAN</td>
+    <td rowspan="6">GauGAN</td>
     <td rowspan="4">Cityscapes</td>
     <td>Original</td>
     <td>93.0M</td>
@@ -398,6 +398,21 @@ Here we show the performance of all our released models:
     <td>31.3G</td>
     <td>56.25</td>
     <td>61.17</td>
+  </tr>
+  <tr>
+    <td rowspan="2">Coco-Stuff</td>
+    <td>Original</td>
+    <td>TBA</td>
+    <td>TBA</td>
+    <td>21.38</td>
+    <td>38.78</td>
+  </tr>
+  <tr>
+    <td>Lite Pipeline</td>
+    <td>NA</td>
+    <td>35.5G</td>
+    <td>TBA</td>
+    <td>35.05</td>
   </tr>
 </tbody>
 </table>

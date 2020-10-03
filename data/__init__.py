@@ -65,7 +65,7 @@ def create_eval_dataloader(opt, direction=None):
     return dataloader
 
 
-def create_train_dataloader(opt, direction=None):
+def create_train_dataloader(opt):
     opt = copy.deepcopy(opt)
     # Set some evaluation options
     # opt.prepocess = 'resize_and_crop'
@@ -73,7 +73,7 @@ def create_train_dataloader(opt, direction=None):
     opt.serial_batches = False
     opt.phase = 'train'
     opt.load_in_memory = False
-    opt.max_dataset_size = 256
+    opt.max_dataset_size = 512
     dataloader = CustomDatasetDataLoader(opt)
     dataloader = dataloader.load_data()
     return dataloader
