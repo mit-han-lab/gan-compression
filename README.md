@@ -227,7 +227,13 @@ python datasets/prepare_cityscapes_dataset.py \
 
 You will get a preprocessed dataset in `database/cityscapes` and a mapping table (used to compute mIoU) in `dataset/table.txt`.
 
-To support mIoU computation, you need to download a pre-trained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of our repo. Then you can test our compressed models on cityscapes after you have downloaded our compressed models.
+To support mIoU computation, you need to download a pre-trained DRN model `drn-d-105_ms_cityscapes.pth` from http://go.yf.io/drn-cityscapes-models. By default, we put the drn model in the root directory of the repo. Then you can test our compressed models on cityscapes after you have downloaded our models.
+
+### COCO-Stuff Dataset
+
+We follow the same COCO-Stuff dataset preparation as [NVlabs/spade](https://github.com/NVlabs/SPADE). Specifically, you need to download `train2017.zip`, `val2017.zip`, `stuffthingmaps_trainval2017.zip`, and `annotations_trainval2017.zip` from [nightrome/cocostuff](https://github.com/nightrome/cocostuff). The images, labels, and instance maps should be arranged in the same directory structure as in [datasets/coco_stuff](https://github.com/NVlabs/SPADE/tree/master/datasets/coco_stuff). In particular, we used an instance map that combines both the  boundaries of "things instance map" and "stuff label map". To do this,  we used a simple script [datasets/coco_generate_instance_map.py](datasets/coco_generate_instance_map.py). 
+
+To support mIoU computation, you need to download a pre-trained DeeplabV2 model [deeplabv2_resnet101_msc-cocostuff164k-100000.pth](https://github.com/kazuto1011/deeplab-pytorch/releases/download/v1.0/deeplabv2_resnet101_msc-cocostuff164k-100000.pth) and also put it in the root directory of the repo.
 
 ### Performance of Released Models
 
@@ -456,3 +462,4 @@ If you use this code for your research, please cite our [paper](https://arxiv.or
 Our code is developed based on [pytorch-CycleGAN-and-pix2pix](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) and [SPADE](https://github.com/NVlabs/SPADE).
 
 We also thank [pytorch-fid](https://github.com/mseitzer/pytorch-fid) for FID computation, [drn](https://github.com/fyu/drn) for cityscapes mIoU computation and [deeplabv2](https://github.com/kazuto1011/deeplab-pytorch) for Coco-Stuff mIoU computation.
+
