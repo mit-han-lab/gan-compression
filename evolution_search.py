@@ -121,7 +121,7 @@ class EvolutionSearcher:
         while True:
             new_sample = copy.deepcopy(sample1)
             for i in range(len(new_sample['channels'])):
-                new_sample['channels'][i] = random.choice([sample1['channels'][i], sample2['channels'][1]])
+                new_sample['channels'][i] = random.choice([sample1['channels'][i], sample2['channels'][i]])
             macs = self.macs_cache.get(encode_config(new_sample))
             if macs is None:
                 macs, _ = self.model.profile(new_sample, verbose=False)
