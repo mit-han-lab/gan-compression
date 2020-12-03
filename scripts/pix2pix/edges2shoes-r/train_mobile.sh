@@ -2,4 +2,5 @@
 python train.py --dataroot database/edges2shoes-r \
   --model pix2pix \
   --log_dir logs/pix2pix/edges2shoes-r/mobile \
-  --real_stat_path real_stat/edges2shoes-r_B.npz
+  --real_stat_path real_stat/edges2shoes-r_B.npz \
+  --batch_size 4
