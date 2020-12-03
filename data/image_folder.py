@@ -56,7 +56,11 @@ def make_dataset(dir, max_dataset_size=float("inf"), recursive=False, read_cache
             for path in images:
                 f.write("%s\n" % path)
             print('wrote filelist cache at %s' % filelist_cache)
-    return images[:min(max_dataset_size, len(images))]
+
+    if max_dataset_size == -1:
+        return images
+    else:
+        return images[:min(max_dataset_size, len(images))]
 
 
 def default_loader(path):
