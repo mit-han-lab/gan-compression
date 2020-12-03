@@ -207,7 +207,7 @@ class EvolutionSearcher:
                 child_pool.append(sample)
                 macs_pool.append(macs)
             results = self.evaluate(child_pool)
-            for i in range(mutation_numbers):
+            for i in range(population_size):
                 population.append((results[i], child_pool[i], macs_pool[i]))
 
         evolution_tqdm = trange(opt.generation_base, opt.generation_base + opt.evolution_iters,
