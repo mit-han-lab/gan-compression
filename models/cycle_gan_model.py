@@ -11,11 +11,11 @@ from data import create_eval_dataloader
 from metric import get_fid, get_cityscapes_mIoU
 from metric.cityscapes_mIoU import DRNSeg
 from metric.inception import InceptionV3
+from models import networks
+from models.base_model import BaseModel
+from models.modules.loss import GANLoss
 from utils import util
 from utils.image_pool import ImagePool
-from . import networks
-from .base_model import BaseModel
-from .modules.loss import GANLoss
 
 
 class CycleGANModel(BaseModel):
@@ -86,7 +86,7 @@ class CycleGANModel(BaseModel):
         assert opt.isTrain
         assert opt.direction == 'AtoB'
         assert opt.dataset_mode == 'unaligned'
-        BaseModel.__init__(self, opt)
+        super(CycleGANModel, self).__init__(opt)
         # specify the training losses you want to print out. The training/test scripts will call <BaseModel.get_current_losses>
         self.loss_names = ['D_A', 'G_A', 'G_cycle_A', 'G_idt_A',
                            'D_B', 'G_B', 'G_cycle_B', 'G_idt_B']
@@ -104,15 +104,20 @@ class CycleGANModel(BaseModel):
         # define networks (both Generators and discriminators)
         # The naming is different from those used in the paper.
         # Code (vs. paper): G_A (G), G_B (F), D_A (D_Y), D_B (D_X)
-        self.netG_A = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG, opt.norm,
-                                        opt.dropout_rate, opt.init_type, opt.init_gain, self.gpu_ids)
-        self.netG_B = networks.define_G(opt.output_nc, opt.input_nc, opt.ngf, opt.netG, opt.norm,
-                                        opt.dropout_rate, opt.init_type, opt.init_gain, self.gpu_ids)
-
-        self.netD_A = networks.define_D(opt.output_nc, opt.ndf, opt.netD,
-                                        opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
-        self.netD_B = networks.define_D(opt.input_nc, opt.ndf, opt.netD,
-                                        opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+        self.netG_A = networks.define_G(opt.netG, input_nc=opt.input_nc, output_nc=opt.output_nc, ngf=opt.ngf,
+                                        norm=opt.norm, dropout_rate=opt.dropout_rate, init_type=opt.init_type,
+                                        init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
+        self.netG_B = networks.define_G(opt.netG, input_nc=opt.input_nc, output_nc=opt.output_nc, ngf=opt.ngf,
+                                        norm=opt.norm, dropout_rate=opt.dropout_rate, init_type=opt.init_type,
+                                        init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
+        self.netD_A = networks.define_D(opt.netD, input_nc=opt.output_nc, ndf=opt.ndf,
+                                        n_layers_D=opt.n_layers_D, norm=opt.norm,
+                                        init_type=opt.init_type, init_gain=opt.init_gain,
+                                        gpu_ids=self.gpu_ids, opt=opt)
+        self.netD_B = networks.define_D(opt.netD, input_nc=opt.input_nc, ndf=opt.ndf,
+                                        n_layers_D=opt.n_layers_D, norm=opt.norm,
+                                        init_type=opt.init_type, init_gain=opt.init_gain,
+                                        gpu_ids=self.gpu_ids, opt=opt)
 
         if opt.lambda_identity > 0.0:  # only works when input and output images have the same number of channels
             assert (opt.input_nc == opt.output_nc)
@@ -231,9 +236,9 @@ class CycleGANModel(BaseModel):
             self.loss_G_idt_B = 0
 
         # GAN loss D_A(G_A(A))
-        self.loss_G_A = self.criterionGAN(self.netD_A(self.fake_B), True)
+        self.loss_G_A = self.criterionGAN(self.netD_A(self.fake_B), True, for_discriminator=False)
         # GAN loss D_B(G_B(B))
-        self.loss_G_B = self.criterionGAN(self.netD_B(self.fake_A), True)
+        self.loss_G_B = self.criterionGAN(self.netD_B(self.fake_A), True, for_discriminator=False)
         # Forward cycle loss || G_B(G_A(A)) - A||
         self.loss_G_cycle_A = self.criterionCycle(self.rec_A, self.real_A) * lambda_A
         # Backward cycle loss || G_A(G_B(B)) - B||
@@ -255,7 +260,7 @@ class CycleGANModel(BaseModel):
         self.set_requires_grad([self.netD_A, self.netD_B], True)
         self.optimizer_D.zero_grad()  # set D_A and D_B's gradients to zero
         self.backward_D_A()  # calculate gradients for D_A
-        self.backward_D_B()  # calculate graidents for D_B
+        self.backward_D_B()  # calculate gradients for D_B
         self.optimizer_D.step()  # update D_A and D_B's weights
 
     def test_single_side(self, direction):

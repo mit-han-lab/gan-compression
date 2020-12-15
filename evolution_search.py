@@ -36,8 +36,6 @@ def check(opt):
     assert opt.no_flip
     assert opt.load_size == opt.crop_size
     assert opt.config_set is not None
-    if len(opt.gpu_ids) > 1:
-        warnings.warn('The code only supports single GPU. Only gpu [%d] will be used.' % opt.gpu_ids[0])
     if opt.phase == 'train':
         warnings.warn('You are using training set for evaluation.')
     warnings.filterwarnings("ignore")
@@ -62,6 +60,8 @@ def dict2str(d: dict):
             ret += '%.2f' % v
         else:
             ret += str(v)
+        if i != len(d) - 1:
+            ret += ','
     ret += '}'
     return ret
 
@@ -87,7 +87,8 @@ class EvolutionSearcher:
         self.model = model
         self.device = model.device
         self.inception_model, self.drn_model, self.deeplabv2_model = create_metric_models(opt, self.device)
-        self.npz = np.load(opt.real_stat_path)
+        if self.inception_model is not None:
+            self.npz = np.load(opt.real_stat_path)
         self.macs_cache = {}
         self.result_cache = {}
 
@@ -131,6 +132,7 @@ class EvolutionSearcher:
                 return new_sample, macs
 
     def evaluate(self, child_pool):
+        opt = self.opt
         results = []
         for child in tqdm(child_pool, position=1, desc='Evaluate   ', leave=False):
             result = self.result_cache.get(encode_config(child))
@@ -148,8 +150,8 @@ class EvolutionSearcher:
                         name = os.path.splitext(short_path)[0]
                         names.append(name)
                 if self.inception_model is not None:
-                    result['fid'] = get_fid(fakes, self.inception_model, self.npz,
-                                            self.device, opt.batch_size, tqdm_position=2)
+                    result['fid'] = get_fid(fakes, self.inception_model, self.npz, self.device,
+                                            opt.batch_size, tqdm_position=2)
                 if self.drn_model is not None:
                     result['mIoU'] = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
                                                          data_dir=opt.cityscapes_path, batch_size=opt.batch_size,
@@ -196,10 +198,11 @@ class EvolutionSearcher:
         parents_size = int(round(opt.parent_ratio * population_size))
         print('Start Evolution...')
         last_save_time = time.time()
+
         parents = []
         if opt.restore_pkl_path is not None:
             population, best_valids, best_infos = self.restore_pkl(opt.restore_pkl_path)
-        else:
+        if opt.only_restore_cache or opt.restore_pkl_path is None:
             population, child_pool, macs_pool = [], [], []
             best_valids, best_infos = [], []
             for _ in trange(population_size, desc='Sample     '):

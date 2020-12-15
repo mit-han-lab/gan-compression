@@ -1,4 +1,4 @@
-from .base_options import BaseOptions
+from options.base_options import BaseOptions
 
 
 class TestOptions(BaseOptions):
@@ -17,17 +17,8 @@ class TestOptions(BaseOptions):
         parser.add_argument('--need_profile', action='store_true')
         parser.add_argument('--num_test', type=int, default=float('inf'), help='how many test images to run')
         parser.add_argument('--model', type=str, default='test', help='which model do you want test')
-        parser.add_argument('--restore_G_path', type=str, required=True, help='the path to restore the generator')
         parser.add_argument('--netG', type=str, default='sub_mobile_resnet_9blocks',
-                            choices=['resnet_9blocks',
-                                     'mobile_resnet_9blocks',
-                                     'super_mobile_resnet_9blocks',
-                                     'sub_mobile_resnet_9blocks',
-                                     'legacy_sub_mobile_resnet_9blocks',
-                                     'spade', 'mobile_spade',
-                                     'sub_mobile_spade',
-                                     'super_mobile_spade'],
-                            help='specify generator architecture')
+                            help='specify the generator architecture')
         parser.add_argument('--ngf', type=int, default=64, help='the base number of filters of the student generator')
         parser.add_argument('--dropout_rate', type=float, default=0, help='the dropout rate of the generator')
         # rewrite devalue values

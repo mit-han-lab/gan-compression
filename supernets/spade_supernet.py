@@ -30,6 +30,7 @@ class SPADESupernet(BaseSPADEDistiller):
         return parser
 
     def __init__(self, opt):
+        assert 'super' in opt.student_netG
         super(SPADESupernet, self).__init__(opt)
         self.best_fid_largest = 1e9
         self.best_fid_smallest = 1e9

@@ -1,4 +1,6 @@
-from .base_options import BaseOptions
+from argparse import ArgumentParser
+
+from options.base_options import BaseOptions
 
 
 class TrainOptions(BaseOptions):
@@ -14,6 +16,7 @@ class TrainOptions(BaseOptions):
     def initialize(self, parser):
         parser = BaseOptions.initialize(self, parser)
         # log parameters
+        assert isinstance(parser, ArgumentParser)
         parser.add_argument('--log_dir', type=str, default='logs',
                             help='training logs are saved here')
         parser.add_argument('--tensorboard_dir', type=str, default=None,
@@ -36,12 +39,12 @@ class TrainOptions(BaseOptions):
                                  'The basic model is a 70x70 PatchGAN. '
                                  'n_layers allows you to specify the layers in the discriminator')
         parser.add_argument('--netG', type=str, default='mobile_resnet_9blocks',
-                            help='specify generator architecture '
-                                 '[resnet_9blocks | mobile_resnet_9blocks | super_mobile_resnet_9blocks]')
+                            help='specify the generator architecture')
         parser.add_argument('--ngf', type=int, default=64, help='the base number of generator filters')
         parser.add_argument('--ndf', type=int, default=128, help='the base number of discriminator filters')
         parser.add_argument('--n_layers_D', type=int, default=3, help='only used if netD==n_layers')
         parser.add_argument('--dropout_rate', type=float, default=0, help='the dropout rate of the generator')
+
         parser.add_argument('--restore_O_path', type=str, default=None,
                             help='the path to restore the optimizer')
 
@@ -50,6 +53,8 @@ class TrainOptions(BaseOptions):
                             help='number of epochs with the initial learning rate')
         parser.add_argument('--nepochs_decay', type=int, default=15,
                             help='number of epochs to linearly decay learning rate to zero')
+        parser.add_argument('--niters', type=int, default=1000000000,
+                            help='max number of iteration of the training')
         parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
         parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate for adam')
         parser.add_argument('--gan_mode', type=str, default='hinge',
@@ -59,9 +64,17 @@ class TrainOptions(BaseOptions):
                             help='the size of image buffer that stores previously generated images')
         parser.add_argument('--lr_policy', type=str, default='linear',
                             help='learning rate policy. [linear | step | plateau | cosine]')
-        parser.add_argument('--lr_decay_iters', type=int, default=50,
-                            help='multiply by a gamma every lr_decay_iters iterations')
+        parser.add_argument('--lr_decay_steps', type=int, default=100000,
+                            help='multiply by a gamma every lr_decay_steps steps (only for step lr policy)')
+        parser.add_argument('--scheduler_counter', type=str, default='epoch', choices=['epoch', 'iter'],
+                            help='which counter to use for the scheduler')
+        parser.add_argument('--gamma', type=float, default=0.5,
+                            help='multiply by a gamma every lr_decay_epochs epochs (only for step lr policy)')
 
+        # evaluation parameters
         parser.add_argument('--eval_batch_size', type=int, default=1, help='the evaluation batch size')
+        parser.add_argument('--no_fid', action='store_true', help='No FID evaluation during training')
+        parser.add_argument('--no_mIoU', action='store_true', help='No mIoU evaluation during training '
+                                                                   '(sometimes because there are CUDA memory)')
         self.isTrain = True
         return parser

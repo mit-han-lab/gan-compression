@@ -1,4 +1,4 @@
-from .base_options import BaseOptions
+from options.base_options import BaseOptions
 
 
 class SearchOptions(BaseOptions):
@@ -17,8 +17,6 @@ class SearchOptions(BaseOptions):
                             help='the path to save the evaluation result.')
         parser.add_argument('--num_test', type=int, default=float('inf'), help='how many test images to run')
         parser.add_argument('--model', type=str, default='test', help='which model do you want test')
-        parser.add_argument('--restore_G_path', type=str, required=True,
-                            help='the path to restore the generator')
         parser.add_argument('--no_fid', action='store_true',
                             help='whether you want to compute FID.')
         parser.add_argument('--no_mIoU', action='store_true',

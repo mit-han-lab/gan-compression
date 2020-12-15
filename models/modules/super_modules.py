@@ -2,8 +2,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .sync_batchnorm import SynchronizedBatchNorm2d
-from .sync_batchnorm.batchnorm import _ChildMessage, _sum_ft, _unsqueeze_ft
+from models.modules.sync_batchnorm import SynchronizedBatchNorm2d
+from models.modules.sync_batchnorm.batchnorm import _ChildMessage, _sum_ft, _unsqueeze_ft
 
 
 class SuperConv2d(nn.Conv2d):

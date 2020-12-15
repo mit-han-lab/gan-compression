@@ -20,14 +20,12 @@ class SPADEModelModules(nn.Module):
         self.opt = opt
         self.model_names = ['G']
         self.visual_names = ['labels', 'fake_B', 'real_B']
-        self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG,
-                                      opt.norm, opt.dropout_rate, opt.init_type,
-                                      opt.init_gain, self.gpu_ids, opt=opt)
+        self.netG = networks.define_G(opt.netG, init_type=opt.init_type,
+                                      init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
         if opt.isTrain:
             self.model_names.append('D')
-            self.netD = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf,
-                                          opt.netD, opt.n_layers_D, opt.norm,
-                                          opt.init_type, opt.init_gain, self.gpu_ids, opt=opt)
+            self.netD = networks.define_D(opt.netD, init_type=opt.init_type,
+                                          init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
             self.criterionGAN = GANLoss(opt.gan_mode)
             self.criterionFeat = nn.L1Loss()
             self.criterionVGG = VGGLoss()

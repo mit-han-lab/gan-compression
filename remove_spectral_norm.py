@@ -9,7 +9,7 @@ from utils import util
 
 def main(opt):
     # define the generator with spectral normalization. Only the last argument counts
-    netG = networks.define_G(None, None, None, opt.netG, opt=opt)
+    netG = networks.define_G(opt.netG, opt=opt)
     util.load_network(netG, opt.restore_G_path, True)
     print(netG)
     netG.remove_spectral_norm()

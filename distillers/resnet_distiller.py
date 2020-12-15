@@ -1,17 +1,16 @@
 import ntpath
 import os
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
 from torch.nn.parallel import gather, parallel_apply, replicate
 from tqdm import tqdm
 
+from distillers.base_resnet_distiller import BaseResnetDistiller
 from metric import get_fid, get_cityscapes_mIoU
 from utils import util
 from utils.weight_transfer import load_pretrained_weight
-from .base_resnet_distiller import BaseResnetDistiller
 
 
 class ResnetDistiller(BaseResnetDistiller):
@@ -36,7 +35,6 @@ class ResnetDistiller(BaseResnetDistiller):
         self.best_fid = 1e9
         self.best_mIoU = -1e9
         self.fids, self.mIoUs = [], []
-        self.npz = np.load(opt.real_stat_path)
 
     def forward(self):
         with torch.no_grad():
@@ -57,22 +55,6 @@ class ResnetDistiller(BaseResnetDistiller):
             setattr(self, 'loss_G_distill%d' % i, loss)
             losses.append(loss)
         return sum(losses)
-
-    def backward_G(self):
-        if self.opt.dataset_mode == 'aligned':
-            self.loss_G_recon = self.criterionRecon(self.Sfake_B, self.real_B) * self.opt.lambda_recon
-            fake = torch.cat((self.real_A, self.Sfake_B), 1)
-        else:
-            self.loss_G_recon = self.criterionRecon(self.Sfake_B, self.Tfake_B) * self.opt.lambda_recon
-            fake = self.Sfake_B
-        pred_fake = self.netD(fake)
-        self.loss_G_gan = self.criterionGAN(pred_fake, True, for_discriminator=False) * self.opt.lambda_gan
-        if self.opt.lambda_distill > 0:
-            self.loss_G_distill = self.calc_distill_loss() * self.opt.lambda_distill
-        else:
-            self.loss_G_distill = 0
-        self.loss_G = self.loss_G_gan + self.loss_G_recon + self.loss_G_distill
-        self.loss_G.backward()
 
     def optimize_parameters(self, steps):
         self.optimizer_D.zero_grad()

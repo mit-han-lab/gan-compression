@@ -92,14 +92,20 @@ class Trainer:
 
                 if total_iter % opt.save_latest_freq == 0:
                     self.evaluate(epoch, total_iter,
-                                  'Saving the latest model (epoch %d, total_steps %d)' % (epoch, total_iter))
+                                  'Saving the latest model (epoch %d, total_iters %d)' % (epoch, total_iter))
                     if model.is_best:
                         model.save_networks('iter%d' % total_iter)
 
+                if opt.scheduler_counter == 'iter':
+                    model.update_learning_rate(epoch, total_iter, logger=logger)
+
+                if total_iter >= opt.niters:
+                    break
             logger.print_info(
                 'End of epoch %d / %d \t Time Taken: %.2f sec' % (epoch, end_epoch, time.time() - epoch_start_time))
-            if epoch % opt.save_epoch_freq == 0 or epoch == end_epoch:
+            if epoch % opt.save_epoch_freq == 0 or epoch == end_epoch or total_iter >= opt.niters:
                 self.evaluate(epoch, total_iter,
                               'Saving the model at the end of epoch %d, iters %d' % (epoch, total_iter))
                 model.save_networks(epoch)
-            model.update_learning_rate(logger)
+            if opt.scheduler_counter == 'epoch':
+                model.update_learning_rate(epoch, total_iter, logger=logger)

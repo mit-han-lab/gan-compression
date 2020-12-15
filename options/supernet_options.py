@@ -2,7 +2,7 @@ import argparse
 
 import data
 import supernets
-from .base_options import BaseOptions
+from options.base_options import BaseOptions
 
 
 class SupernetOptions(BaseOptions):
@@ -39,31 +39,55 @@ class SupernetOptions(BaseOptions):
         # model parameters
         parser.add_argument('--supernet', type=str, default='resnet',
                             help='specify which supernet you want to use [resnet | spade]')
+        parser.add_argument('--teacher_netG', type=str, help='specify teacher generator architecture')
+        parser.add_argument('--student_netG', type=str, help='specify student generator architecture')
         parser.add_argument('--netD', type=str, default='n_layers',
                             help='specify discriminator architecture [n_layers | pixel]. '
                                  'The basic model is a 70x70 PatchGAN. '
                                  'n_layers allows you to specify the layers in the discriminator')
+        parser.add_argument('--teacher_ngf', type=int, help='the   number of filters of the teacher generator')
+        parser.add_argument('--student_ngf', type=int, help='the base number of filters of the student generator')
         parser.add_argument('--ndf', type=int, default=128, help='the base number of discriminator filters')
         parser.add_argument('--n_layers_D', type=int, default=3, help='only used if netD==n_layers')
         parser.add_argument('--gan_mode', type=str, default='hinge', choices=['lsgan', 'vanilla', 'hinge'],
                             help='the type of GAN objective. [vanilla| lsgan | hinge]. '
                                  'vanilla GAN loss is the cross-entropy objective used in the original GAN paper.')
 
+        parser.add_argument('--restore_teacher_G_path', type=str, required=True,
+                            help='the path to restore the teacher generator')
+        parser.add_argument('--restore_student_G_path', type=str, default=None,
+                            help='the path to restore the student generator')
+        parser.add_argument('--restore_A_path', type=str, default=None,
+                            help='the path to restore the adaptors for distillation')
+        parser.add_argument('--restore_D_path', type=str, default=None,
+                            help='the path to restore the discriminator')
+        parser.add_argument('--restore_O_path', type=str, default=None,
+                            help='the path to restore the optimizer')
+
         # training parameters
         parser.add_argument('--nepochs', type=int, default=10,
                             help='number of epochs with the initial learning rate')
         parser.add_argument('--nepochs_decay', type=int, default=30,
                             help='number of epochs to linearly decay learning rate to zero')
+        parser.add_argument('--niters', type=int, default=1000000000,
+                            help='max number of iteration of the training')
         parser.add_argument('--beta1', type=float, default=0.5, help='momentum term of adam')
         parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate for adam')
         parser.add_argument('--lr_policy', type=str, default='linear',
                             help='learning rate policy. [linear | step | plateau | cosine]')
-        parser.add_argument('--lr_decay_iters', type=int, default=50,
-                            help='multiply by a gamma every lr_decay_iters iterations')
+        parser.add_argument('--lr_decay_steps', type=int, default=100000,
+                            help='multiply by a gamma every lr_decay_steps steps (only for step lr policy)')
+        parser.add_argument('--scheduler_counter', type=str, default='epoch', choices=['epoch', 'iter'],
+                            help='which counter to use for the scheduler')
+        parser.add_argument('--gamma', type=float, default=0.5,
+                            help='multiply by a gamma every lr_decay_epochs epochs (only for step lr policy)')
 
         parser.add_argument('--eval_batch_size', type=int, default=1, help='the evaluation batch size')
         parser.add_argument('--real_stat_path', type=str, required=True,
                             help='the path to load the ground-truth images information to compute FID.')
+        parser.add_argument('--no_fid', action='store_true', help='No FID evaluation during training')
+        parser.add_argument('--no_mIoU', action='store_true', help='No mIoU evaluation during training '
+                                                                   '(sometimes because there are CUDA memory)')
         return parser
 
     def gather_options(self):

@@ -12,6 +12,13 @@ from utils import util
 
 
 class BaseSPADEDistillerModules(SPADEModelModules):
+    def create_option(self, role):
+        assert role in ['teacher', 'student', 'pretrained']
+        opt = copy.deepcopy(self.opt)
+        opt.ngf = getattr(self.opt, '%s_ngf' % role)
+        opt.norm_G = getattr(self.opt, '%s_norm_G' % role)
+        return opt
+
     def __init__(self, opt):
         assert opt.isTrain
         opt = copy.deepcopy(opt)
@@ -21,28 +28,17 @@ class BaseSPADEDistillerModules(SPADEModelModules):
         super(SPADEModelModules, self).__init__()
         self.opt = opt
         self.model_names = ['G_student', 'G_teacher', 'D']
-        teacher_opt = copy.deepcopy(opt)
-        teacher_opt.norm_G = opt.teacher_norm_G
-        teacher_opt.ngf = opt.teacher_ngf
-        self.netG_teacher = networks.define_G(opt.input_nc, opt.output_nc, opt.teacher_ngf,
-                                              opt.teacher_netG, opt.norm, 0,
-                                              opt.init_type, opt.init_gain, self.gpu_ids, opt=teacher_opt)
-        student_opt = copy.deepcopy(opt)
-        student_opt.norm_G = opt.student_norm_G
-        student_opt.ngf = opt.student_ngf
-        self.netG_student = networks.define_G(opt.input_nc, opt.output_nc, opt.student_ngf,
-                                              opt.student_netG, opt.norm, 0,
-                                              opt.init_type, opt.init_gain, self.gpu_ids, opt=student_opt)
+
+        teacher_opt = self.create_option('teacher')
+        self.netG_teacher = networks.define_G(opt.teacher_netG, gpu_ids=self.gpu_ids, opt=teacher_opt)
+        student_opt = self.create_option('student')
+        self.netG_student = networks.define_G(opt.student_netG, init_type=opt.init_type,
+                                              init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=student_opt)
         if hasattr(opt, 'distiller'):
-            pretrained_opt = copy.deepcopy(opt)
-            pretrained_opt.norm_G = opt.pretrained_norm_G
-            pretrained_opt.ngf = opt.pretrained_ngf
-            self.netG_pretrained = networks.define_G(opt.input_nc, opt.output_nc, opt.pretrained_ngf,
-                                                     opt.pretrained_netG, opt.norm, 0,
-                                                     opt.init_type, opt.init_gain, self.gpu_ids, opt=pretrained_opt)
-        self.netD = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf,
-                                      opt.netD, opt.n_layers_D, opt.norm,
-                                      opt.init_type, opt.init_gain, self.gpu_ids, opt=opt)
+            pretrained_opt = self.create_option('pretrained')
+            self.netG_pretrained = networks.define_G(opt.pretrained_netG, gpu_ids=self.gpu_ids, opt=pretrained_opt)
+        self.netD = networks.define_D(opt.netD, init_type=opt.init_type,
+                                      init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
         self.mapping_layers = ['head_0', 'G_middle_1', 'up_1']
         self.netAs = nn.ModuleList()
         for i, mapping_layer in enumerate(self.mapping_layers):

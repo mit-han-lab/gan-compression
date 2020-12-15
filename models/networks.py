@@ -60,18 +60,22 @@ def get_scheduler(optimizer, opt):
     For other schedulers (step, plateau, and cosine), we use the default PyTorch schedulers.
     See https://pytorch.org/docs/stable/optim.html for more details.
     """
+    if opt.scheduler_counter == 'epoch':
+        last_epoch = opt.epoch_base - 2
+    else:
+        last_epoch = opt.iter_base - 1
     if opt.lr_policy == 'linear':
         def lambda_rule(epoch):
             lr_l = 1.0 - max(0, epoch + 1 - opt.nepochs) / float(opt.nepochs_decay + 1)
             return lr_l
 
-        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
+        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule, last_epoch=last_epoch)
     elif opt.lr_policy == 'step':
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_iters, gamma=0.1)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_steps, gamma=opt.gamma, last_epoch=last_epoch)
     elif opt.lr_policy == 'plateau':
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
     elif opt.lr_policy == 'cosine':
-        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt.niter, eta_min=0)
+        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt.niter, eta_min=0, last_epoch=last_epoch)
     else:
         return NotImplementedError('learning rate policy [%s] is not implemented', opt.lr_policy)
     return scheduler
@@ -135,94 +139,80 @@ def init_net(net, init_type='normal', init_gain=0.02, gpu_ids=[]):
     return net
 
 
-def define_G(input_nc, output_nc, ngf, netG, norm='batch', dropout_rate=0,
-             init_type='normal', init_gain=0.02, gpu_ids=[], opt=None):
-    norm_layer = get_norm_layer(norm_type=norm)
-    if netG == 'resnet_9blocks':
-        from .modules.resnet_architecture.resnet_generator import ResnetGenerator
-        net = ResnetGenerator(input_nc, output_nc, ngf, norm_layer=norm_layer,
-                              dropout_rate=dropout_rate, n_blocks=9)
-    elif netG == 'mobile_resnet_9blocks':
-        from .modules.resnet_architecture.mobile_resnet_generator import MobileResnetGenerator
-        net = MobileResnetGenerator(input_nc, output_nc, ngf=ngf, norm_layer=norm_layer,
-                                    dropout_rate=dropout_rate, n_blocks=9)
-    elif netG == 'super_mobile_resnet_9blocks':
-        from .modules.resnet_architecture.super_mobile_resnet_generator import SuperMobileResnetGenerator
-        net = SuperMobileResnetGenerator(input_nc, output_nc, ngf=ngf, norm_layer=norm_layer,
-                                         dropout_rate=dropout_rate, n_blocks=9)
-    elif netG == 'sub_mobile_resnet_9blocks':
-        from .modules.resnet_architecture.sub_mobile_resnet_generator import SubMobileResnetGenerator
+def define_G(netG, **kwargs):
+    Generator = get_netG_cls(netG)
+    if netG in ['resnet_9blocks', 'mobile_resnet_9blocks', 'super_mobile_resnet_9blocks']:
+        assert 'input_nc' in kwargs and 'output_nc' in kwargs and 'ngf' in kwargs
+        input_nc = kwargs.get('input_nc')
+        output_nc = kwargs.get('output_nc')
+        ngf = kwargs.get('ngf')
+        dropout_rate = kwargs.get('dropout_rate', 0)
+        norm = kwargs.get('norm', 'batch')
+        norm_layer = get_norm_layer(norm_type=norm)
+        net = Generator(input_nc, output_nc, ngf=ngf, norm_layer=norm_layer,
+                        dropout_rate=dropout_rate, n_blocks=9)
+    elif netG in ['sub_mobile_resnet_9blocks', 'legacy_sub_mobile_resnet_9blocks']:
+        assert 'input_nc' in kwargs and 'output_nc' in kwargs and 'opt' in kwargs
+        input_nc = kwargs.get('input_nc')
+        output_nc = kwargs.get('output_nc')
+        dropout_rate = kwargs.get('dropout_rate', 0)
+        norm = kwargs.get('norm', 'batch')
+        opt = kwargs.get('opt')
+        norm_layer = get_norm_layer(norm_type=norm)
         assert opt.config_str is not None
         config = decode_config(opt.config_str)
-        net = SubMobileResnetGenerator(input_nc, output_nc, config, norm_layer=norm_layer,
-                                       dropout_rate=dropout_rate, n_blocks=9)
-    elif netG == 'legacy_sub_mobile_resnet_9blocks':
-        from .modules.resnet_architecture.legacy_sub_mobile_resnet_generator import LegacySubMobileResnetGenerator
-        assert opt.config_str is not None
-        config = decode_config(opt.config_str)
-        net = LegacySubMobileResnetGenerator(input_nc, output_nc, config, norm_layer=norm_layer,
-                                             dropout_rate=dropout_rate, n_blocks=9)
-    elif netG == 'spade':
-        from .modules.spade_architecture.spade_generator import SPADEGenerator
-        net = SPADEGenerator(opt)
-    elif netG == 'mobile_spade':
-        from .modules.spade_architecture.mobile_spade_generator import MobileSPADEGenerator
-        net = MobileSPADEGenerator(opt)
-    elif netG == 'super_mobile_spade':
-        from models.modules.spade_architecture.super_mobile_spade_generator import SuperMobileSPADEGenerator
-        net = SuperMobileSPADEGenerator(opt)
+        net = Generator(input_nc, output_nc, config, norm_layer=norm_layer,
+                        dropout_rate=dropout_rate, n_blocks=9)
+    elif netG in ['spade', 'mobile_spade', 'super_mobile_spade', 'munit', 'mobile_munit', 'mobile_munit2',
+                  'mobile_munit3']:
+        assert 'opt' in kwargs
+        opt = kwargs.get('opt')
+        net = Generator(opt)
     elif netG == 'sub_mobile_spade':
-        from .modules.spade_architecture.sub_mobile_spade_generator import SubMobileSPADEGenerator
+        assert 'opt' in kwargs
+        opt = kwargs.get('opt')
         assert opt.config_str is not None
-        config = decode_config((opt.config_str))
-        net = SubMobileSPADEGenerator(opt, config)
+        config = decode_config(opt.config_str)
+        net = Generator(opt, config)
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
+    init_type = kwargs.get('init_type', 'normal')
+    init_gain = kwargs.get('init_gain', 0.02)
+    gpu_ids = kwargs.get('gpu_ids', [])
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
-def define_D(input_nc, ndf, netD, n_layers_D=3, norm='batch', init_type='normal', init_gain=0.02, gpu_ids=[], opt=None):
-    """Create a discriminator
-
-    Parameters:
-        input_nc (int)     -- the number of channels in input images
-        ndf (int)          -- the number of filters in the first conv layer
-        netD (str)         -- the architecture's name: basic | n_layers | pixel
-        n_layers_D (int)   -- the number of conv layers in the discriminator; effective when netD=='n_layers'
-        norm (str)         -- the type of normalization layers used in the network.
-        init_type (str)    -- the name of the initialization method.
-        init_gain (float)  -- scaling factor for normal, xavier and orthogonal.
-        gpu_ids (int list) -- which GPUs the network runs on: e.g., 0,1,2
-
-    Returns a discriminator
-
-    Our current implementation provides three types of discriminators:
-        [basic]: 'PatchGAN' classifier described in the original pix2pix paper.
-        It can classify whether 70×70 overlapping patches are real or fake.
-        Such a patch-level discriminator architecture has fewer parameters
-        than a full-image discriminator and can work on arbitrarily-sized images
-        in a fully convolutional fashion.
-
-        [n_layers]: With this mode, you cna specify the number of conv layers in the discriminator
-        with the parameter <n_layers_D> (default=3 as used in [basic] (PatchGAN).)
-
-        [pixel]: 1x1 PixelGAN discriminator can classify whether a pixel is real or not.
-        It encourages greater color diversity but has no effect on spatial statistics.
-
-    The discriminator has been initialized by <init_net>. It uses Leakly RELU for non-linearity.
-    """
-    norm_layer = get_norm_layer(norm_type=norm)
+def define_D(netD, **kwargs):
+    Discriminator = get_netD_cls(netD)
     if netD == 'multi_scale':
-        from models.modules.discriminators import MultiscaleDiscriminator
-        net = MultiscaleDiscriminator(opt)
+        assert 'opt' in kwargs
+        opt = kwargs.get('opt')
+        net = Discriminator(opt)
     elif netD == 'n_layers':
-        from models.modules.discriminators import NLayerDiscriminator
-        net = NLayerDiscriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
+        assert 'input_nc' in kwargs and 'ndf' in kwargs
+        input_nc = kwargs.get('input_nc')
+        ndf = kwargs.get('ndf')
+        n_layers_D = kwargs.get('n_layers_D', 3)
+        norm = kwargs.get('norm', 'batch')
+        norm_layer = get_norm_layer(norm_type=norm)
+        net = Discriminator(input_nc, ndf, n_layers_D, norm_layer=norm_layer)
     elif netD == 'pixel':  # classify if each pixel is real or fake
-        from models.modules.discriminators import PixelDiscriminator
-        net = PixelDiscriminator(input_nc, ndf, norm_layer=norm_layer)
+        assert 'input_nc' in kwargs and 'ndf' in kwargs
+        input_nc = kwargs.get('input_nc')
+        ndf = kwargs.get('ndf')
+        norm = kwargs.get('norm', 'batch')
+        norm_layer = get_norm_layer(norm_type=norm)
+        net = Discriminator(input_nc, ndf, norm_layer=norm_layer)
+    elif netD == 'ms_image':
+        assert 'input_nc' in kwargs and 'opt' in kwargs
+        input_nc = kwargs.get('input_nc')
+        opt = kwargs.get('opt')
+        net = Discriminator(input_nc, opt)
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
+    init_type = kwargs.get('init_type', 'normal')
+    init_gain = kwargs.get('init_gain', '0.02')
+    gpu_ids = kwargs.get('gpu_ids', [])
     return init_net(net, init_type, init_gain, gpu_ids)
 
 
@@ -260,13 +250,13 @@ def get_netG_cls(netG):
 
 def get_netD_cls(netD):
     if netD == 'n_layers':
-        from .modules.discriminators import NLayerDiscriminator
+        from models.modules.discriminators import NLayerDiscriminator
         return NLayerDiscriminator
     elif netD == 'pixel':  # classify if each pixel is real or fake
-        from .modules.discriminators import PixelDiscriminator
+        from models.modules.discriminators import PixelDiscriminator
         return PixelDiscriminator
     elif netD == 'multi_scale':
-        from .modules.discriminators import MultiscaleDiscriminator
+        from models.modules.discriminators import MultiscaleDiscriminator
         return MultiscaleDiscriminator
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
@@ -280,5 +270,4 @@ def modify_commandline_options(parser, is_train):
     if is_train:
         netD_cls = get_netD_cls(opt.netD)
         parser = netD_cls.modify_commandline_options(parser, is_train)
-
     return parser

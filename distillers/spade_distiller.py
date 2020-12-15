@@ -5,10 +5,10 @@ import os
 import torch
 from tqdm import tqdm
 
+from distillers.base_spade_distiller import BaseSPADEDistiller
 from metric import get_fid, get_cityscapes_mIoU
 from models import networks
 from utils import util
-from .base_spade_distiller import BaseSPADEDistiller
 
 
 class SPADEDistiller(BaseSPADEDistiller):

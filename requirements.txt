@@ -11,6 +11,8 @@ opencv-python==4.2.0.32
 Pillow==7.0.0
 protobuf==3.11.3
 psutil==5.7.0
+pycocotools
+scikit-image
 scipy==1.4.1
 six==1.14.0
 tensorboard==2.0.0

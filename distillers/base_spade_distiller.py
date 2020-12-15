@@ -17,7 +17,7 @@ from utils import util
 class BaseSPADEDistiller(SPADEModel):
     @staticmethod
     def modify_commandline_options(parser, is_train):
-        assert isinstance(parser, argparse.ArgumentParser)
+        assert is_train and isinstance(parser, argparse.ArgumentParser)
         parser.add_argument('--separable_conv_norm', type=str, default='instance',
                             choices=('none', 'instance', 'batch'),
                             help='whether to use instance norm for the separable convolutions')
@@ -25,45 +25,27 @@ class BaseSPADEDistiller(SPADEModel):
                             choices=('normal', 'more', 'most'), default='more',
                             help="If 'more', adds upsampling layer between the two middle resnet blocks. "
                                  "If 'most', also add one more upsampling + resnet layer at the end of the generator")
-        parser.add_argument('--teacher_netG', type=str, default='mobile_spade',
-                            help='specify teacher generator architecture',
-                            choices=['spade', 'mobile_spade', 'super_mobile_spade', 'sub_mobile_spade'])
-        parser.add_argument('--student_netG', type=str, default='mobile_spade',
-                            help='specify student generator architecture',
-                            choices=['spade', 'mobile_spade', 'super_mobile_spade', 'sub_mobile_spade'])
-        parser.add_argument('--teacher_ngf', type=int, default=64,
-                            help='the base number of filters of the teacher generator')
-        parser.add_argument('--student_ngf', type=int, default=48,
-                            help='the base number of filters of the student generator')
         parser.add_argument('--teacher_norm_G', type=str, default='spadesyncbatch3x3',
                             help='instance normalization or batch normalization of the teacher model')
         parser.add_argument('--student_norm_G', type=str, default='spadesyncbatch3x3',
                             help='instance normalization or batch normalization of the student model')
-        parser.add_argument('--restore_teacher_G_path', type=str, required=True,
-                            help='the path to restore the teacher generator')
-        parser.add_argument('--restore_student_G_path', type=str, default=None,
-                            help='the path to restore the student generator')
-        parser.add_argument('--restore_A_path', type=str, default=None,
-                            help='the path to restore the adaptors for distillation')
-        parser.add_argument('--restore_D_path', type=str, default=None,
-                            help='the path to restore the discriminator')
-        parser.add_argument('--restore_O_path', type=str, default=None,
-                            help='the path to restore the optimizer')
         parser.add_argument('--lambda_gan', type=float, default=1, help='weight for gan loss')
         parser.add_argument('--lambda_feat', type=float, default=10, help='weight for gan feature loss')
         parser.add_argument('--lambda_vgg', type=float, default=10, help='weight for vgg loss')
         parser.add_argument('--lambda_distill', type=float, default=10, help='weight for vgg loss')
         parser.add_argument('--beta2', type=float, default=0.999, help='momentum term of adam')
         parser.add_argument('--no_TTUR', action='store_true', help='Use TTUR training scheme')
-        parser.add_argument('--no_fid', action='store_true', help='No FID evaluation during training')
-        parser.add_argument('--no_mIoU', action='store_true', help='No mIoU evaluation during training '
-                                                                   '(sometimes because there are CUDA memory)')
-        parser.set_defaults(netD='multi_scale', ndf=64, dataset_mode='cityscapes', batch_size=16,
+        parser.set_defaults(teacher_netG='mobile_spade', teacher_ngf=64,
+                            student_netG='mobile_spade', student_ngf=48,
+                            netD='multi_scale', ndf=64, dataset_mode='cityscapes', batch_size=16,
                             print_freq=50, save_latest_freq=10000000000, save_epoch_freq=10,
                             nepochs=100, nepochs_decay=100, init_type='xavier')
         return parser
 
     def __init__(self, opt):
+        assert opt.isTrain
+        valid_netGs = ['spade', 'mobile_spade', 'super_mobile_spade', 'sub_mobile_spade']
+        assert opt.teacher_netG in valid_netGs and opt.student_netG in valid_netGs
         super(SPADEModel, self).__init__(opt)
         self.model_names = ['G_student', 'G_teacher', 'D']
         self.visual_names = ['labels', 'Tfake_B', 'Sfake_B', 'real_B']
@@ -118,14 +100,6 @@ class BaseSPADEDistiller(SPADEModel):
             for i, optimizer in enumerate(self.optimizers):
                 path = '%s-%d.pth' % (self.opt.restore_O_path, i)
                 util.load_optimizer(optimizer, path, verbose)
-        if self.opt.no_TTUR:
-            G_lr, D_lr = self.opt.lr, self.opt.lr
-        else:
-            G_lr, D_lr = self.opt.lr / 2, self.opt.lr * 2
-        for param_group in self.optimizer_G.param_groups:
-            param_group['lr'] = G_lr
-        for param_group in self.optimizer_D.param_groups:
-            param_group['lr'] = D_lr
 
     def save_networks(self, epoch):
         self.modules_on_one_gpu.save_networks(epoch, self.save_dir)

@@ -14,7 +14,6 @@ from distillers.base_resnet_distiller import BaseResnetDistiller
 from metric import get_fid, get_cityscapes_mIoU
 from models.modules.super_modules import SuperConv2d
 from utils import util
-from utils.weight_transfer import load_pretrained_weight
 
 
 class ResnetSupernet(BaseResnetDistiller):
@@ -29,7 +28,6 @@ class ResnetSupernet(BaseResnetDistiller):
         return parser
 
     def __init__(self, opt):
-        assert opt.isTrain
         assert 'super' in opt.student_netG
         super(ResnetSupernet, self).__init__(opt)
         self.best_fid_largest = 1e9
@@ -48,12 +46,12 @@ class ResnetSupernet(BaseResnetDistiller):
             self.opt.eval_mode = 'largest'
 
     def forward(self, config):
-        with torch.no_grad():
-            self.Tfake_B = self.netG_teacher(self.real_A)
         if isinstance(self.netG_student, nn.DataParallel):
             self.netG_student.module.configs = config
         else:
             self.netG_student.configs = config
+        with torch.no_grad():
+            self.Tfake_B = self.netG_teacher(self.real_A)
         self.Sfake_B = self.netG_student(self.real_A)
 
     def calc_distill_loss(self):
@@ -71,22 +69,6 @@ class ResnetSupernet(BaseResnetDistiller):
             setattr(self, 'loss_G_distill%d' % i, loss)
             losses.append(loss)
         return sum(losses)
-
-    def backward_G(self):
-        if self.opt.dataset_mode == 'aligned':
-            self.loss_G_recon = self.criterionRecon(self.Sfake_B, self.real_B) * self.opt.lambda_recon
-            fake = torch.cat((self.real_A, self.Sfake_B), 1)
-        else:
-            self.loss_G_recon = self.criterionRecon(self.Sfake_B, self.Tfake_B) * self.opt.lambda_recon
-            fake = self.Sfake_B
-        pred_fake = self.netD(fake)
-        self.loss_G_gan = self.criterionGAN(pred_fake, True, for_discriminator=False) * self.opt.lambda_gan
-        if self.opt.lambda_distill > 0:
-            self.loss_G_distill = self.calc_distill_loss() * self.opt.lambda_distill
-        else:
-            self.loss_G_distill = 0
-        self.loss_G = self.loss_G_gan + self.loss_G_recon + self.loss_G_distill
-        self.loss_G.backward()
 
     def optimize_parameters(self, steps):
         self.optimizer_D.zero_grad()
@@ -180,8 +162,3 @@ class ResnetSupernet(BaseResnetDistiller):
 
     def load_networks(self, verbose=True):
         super(ResnetSupernet, self).load_networks()
-        if hasattr(self, 'netG_student_tmp'):
-            load_pretrained_weight(self.opt.student_netG.replace('super_', ''), self.opt.student_netG,
-                                   self.netG_student_tmp, self.netG_student,
-                                   self.opt.student_ngf, self.opt.student_ngf)
-            del self.netG_student_tmp

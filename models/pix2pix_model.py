@@ -10,10 +10,10 @@ from data import create_eval_dataloader
 from metric import get_fid, get_cityscapes_mIoU
 from metric.cityscapes_mIoU import DRNSeg
 from metric.inception import InceptionV3
+from models import networks
+from models.base_model import BaseModel
+from models.modules.loss import GANLoss
 from utils import util
-from . import networks
-from .base_model import BaseModel
-from .modules.loss import GANLoss
 
 
 class Pix2PixModel(BaseModel):
@@ -51,13 +51,14 @@ class Pix2PixModel(BaseModel):
         self.visual_names = ['real_A', 'fake_B', 'real_B']
         # specify the models you want to save to the disk. The training/test scripts will call <BaseModel.save_networks> and <BaseModel.load_networks>
         self.model_names = ['G', 'D']
-        # define networks (both generator and discriminator)
-        self.netG = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf, opt.netG,
-                                      opt.norm, opt.dropout_rate, opt.init_type,
-                                      opt.init_gain, self.gpu_ids, opt=opt)
 
-        self.netD = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD,
-                                      opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+        # define networks (both generator and discriminator)
+        self.netG = networks.define_G(opt.netG, input_nc=opt.input_nc, output_nc=opt.output_nc, ngf=opt.ngf,
+                                      norm=opt.norm, dropout_rate=opt.dropout_rate, init_type=opt.init_type,
+                                      init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
+        self.netD = networks.define_D(opt.netD, input_nc=opt.input_nc + opt.output_nc, ndf=opt.ndf,
+                                      n_layers_D=opt.n_layers_D, norm=opt.norm, init_type=opt.init_type,
+                                      init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
 
         # define loss functions
         self.criterionGAN = GANLoss(opt.gan_mode).to(self.device)
@@ -151,8 +152,8 @@ class Pix2PixModel(BaseModel):
         # update G
         self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
         self.optimizer_G.zero_grad()  # set G's gradients to zero
-        self.backward_G()  # calculate graidents for G
-        self.optimizer_G.step()  # udpate G's weights
+        self.backward_G()  # calculate gradients for G
+        self.optimizer_G.step()  # update G's weights
 
     def evaluate_model(self, step):
         self.is_best = False

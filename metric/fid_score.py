@@ -281,7 +281,7 @@ def calculate_frechet_distance(mu1, sigma1, mu2, sigma2, eps=1e-6):
         print('Warning: the fid may be incorrect!')
     tr_covmean = np.trace(covmean)
 
-    return (diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean)
+    return float((diff.dot(diff) + np.trace(sigma1) + np.trace(sigma2) - 2 * tr_covmean))
 
 
 def calculate_activation_statistics(files, model, batch_size=50,

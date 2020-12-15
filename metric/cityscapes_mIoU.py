@@ -200,9 +200,9 @@ def test(fakes, names, model, device, table_path='datasets/table.txt', data_dir=
                                  shuffle=False, num_workers=num_workers)
     model.eval()
     hist = np.zeros((num_classes, num_classes))
-    if tqdm_position:
-        import tqdm
-        dataloader_tqdm = tqdm.tqdm(eval_dataloader, desc='mIoU       ', position=tqdm_position, leave=False)
+    if tqdm_position is None or tqdm_position >= 0:
+        from tqdm import tqdm
+        dataloader_tqdm = tqdm(eval_dataloader, desc='mIoU       ', position=tqdm_position, leave=False)
     else:
         dataloader_tqdm = eval_dataloader
     with torch.no_grad():

@@ -20,8 +20,6 @@ class EvolutionOptions(BaseOptions):
                             help='the path to save the evaluation result.')
         parser.add_argument('--num_test', type=int, default=float('inf'), help='how many test images to run')
         parser.add_argument('--model', type=str, default='test', help='which model do you want test')
-        parser.add_argument('--restore_G_path', type=str, required=True,
-                            help='the path to restore the generator')
         parser.add_argument('--no_fid', action='store_true',
                             help='whether you want to compute FID.')
         parser.add_argument('--no_mIoU', action='store_true',
@@ -36,10 +34,10 @@ class EvolutionOptions(BaseOptions):
                             help='the dropout rate of the generator')
         parser.add_argument('--budget', type=float, default=1e18,
                             help='the MAC budget')
-        parser.add_argument('--real_stat_path', type=str, required=True,
+        parser.add_argument('--real_stat_path', type=str, default=None,
                             help='the path to load the ground-truth images information to compute FID.')
 
-        parser.add_argument('--max_cache_size', type=int, default=1000000,
+        parser.add_argument('--max_cache_size', type=int, default=10000000,
                             help='the cache size to store the results')
         parser.add_argument('--population_size', type=int, default=100)
         parser.add_argument('--mutate_prob', type=float, default=0.2,
@@ -61,8 +59,11 @@ class EvolutionOptions(BaseOptions):
                             help='the generation base of the evolution (used for resuming)')
         parser.add_argument('--restore_pkl_path', type=str, default=None,
                             help='the checkpoint to restore searching')
+        parser.add_argument('--only_restore_cache', action='store_true',
+                            help='whether to only restore caches in the pkl file')
         parser.add_argument('--save_freq', type=int, default=60,
                             help='the number of minutes to save the latest searching results')
+
         # rewrite devalue values
         parser.set_defaults(phase='val', serial_batches=True, no_flip=True,
                             load_size=parser.get_default('crop_size'), load_in_memory=True)

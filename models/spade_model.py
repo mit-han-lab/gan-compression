@@ -46,12 +46,11 @@ class SPADEModel(BaseModel):
             parser.add_argument('--lambda_vgg', type=float, default=10, help='weight for vgg loss')
             parser.add_argument('--beta2', type=float, default=0.999, help='momentum term of adam')
             parser.add_argument('--no_TTUR', action='store_true', help='Use TTUR training scheme')
-            parser.add_argument('--no_fid', action='store_true', help='No FID evaluation during training')
-            parser.add_argument('--no_mIoU', action='store_true', help='No mIoU evaluation during training '
-                                                                       '(sometimes because there are CUDA memory)')
             parser.set_defaults(netD='multi_scale', ndf=64, dataset_mode='cityscapes', batch_size=16,
                                 print_freq=50, save_latest_freq=10000000000, save_epoch_freq=10,
                                 nepochs=100, nepochs_decay=100, init_type='xavier')
+        else:
+            parser.add_argument('--restore_G_path', type=str, required=True, help='the path to restore the generator')
         parser = networks.modify_commandline_options(parser, is_train)
         return parser
 
@@ -253,14 +252,6 @@ class SPADEModel(BaseModel):
             for i, optimizer in enumerate(self.optimizers):
                 path = '%s-%d.pth' % (self.opt.restore_O_path, i)
                 util.load_optimizer(optimizer, path, verbose)
-            if self.opt.no_TTUR:
-                G_lr, D_lr = self.opt.lr, self.opt.lr
-            else:
-                G_lr, D_lr = self.opt.lr / 2, self.opt.lr * 2
-            for param_group in self.optimizer_G.param_groups:
-                param_group['lr'] = G_lr
-            for param_group in self.optimizer_D.param_groups:
-                param_group['lr'] = D_lr
 
     def get_current_visuals(self):
         """Return visualization images. train.py will display these images with visdom, and save the images to a HTML"""

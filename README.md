@@ -1,16 +1,7 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [videos](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex) | [slides](https://hanlab.mit.edu/projects/gancompression/resources/546-slides.pdf) 
-**[NEW!]** GauGAN models on [Coco-stuff](scripts/gaugan/coco_lite) are released! Support evolution search, which is much faster than the previous one! Please refer to our [lite pipeline](docs/lite_pipeline.md)!
 
-**[NEW!]** New features: searching resuming and more user-friendly progress bar during training and searching! Update the [docs of the code](docs/overview.md)! The lite version of [cityscapes for pix2pix](scripts/pix2pix/cityscapes_lite) is released!
-
-**[NEW!]** The lite version of [GauGAN](scripts/gaugan/cityscapes_lite) is released, which could also produce comparable results as the full GauGAN pipeline!
-
-**[NEW!]** The [lite pipeline](docs/lite_pipeline.md) (GAN Compression Lite) is updated, which could produce comparable results as the full pipeline with much simpler procedure! The lite version of [map2sat](scripts/pix2pix/map2sat_lite) is released!
-
-**[NEW!]** The lite pipeline (GAN Compression Lite) is released! Check the [tutorial](docs/lite_pipeline.md) for the pipeline.
-
-**[NEW!]** GauGAN training code and tutorial is released! Check the [tutorial](docs/training_tutorial.md) to compress GauGAN.
+**[NEW!]** The [arXiv v3](https://arxiv.org/abs/2003.08936) is released! We introduce an improved pipeline, [Fast GAN Compression](docs/tutorials/fast_gan_compression.md), which could produce comparable results as GAN Compression with much simpler procedures!
 
 ![teaser](imgs/teaser.png)
 *We introduce GAN Compression, a general-purpose method for compressing conditional GANs. Our method reduces the computation of widely-used conditional GAN models, including pix2pix, CycleGAN, and GauGAN, by 9-21x while preserving the visual fidelity. Our method is effective for a wide range of generator architectures, learning objectives, and both paired and unpaired settings.*
@@ -274,21 +265,21 @@ Here we show the performance of all our released models:
     <td>--</td>
   </tr>
   <tr>
-    <td>Full Pipeline (Paper)</td>
+    <td>GAN Compression (Paper)</td>
     <td>0.342M</td>
     <td>2.67G</td>
     <td>65.33</td>
     <td>--</td>
   </tr>
   <tr>
-    <td>Full Pipeline (Retrained)</td>
+    <td>GAN Compression (Retrained)</td>
     <td>0.357M</td>
     <td>2.55G</td>
     <td>65.12</td>
     <td>--</td>
   </tr>
   <tr>
-    <td>Lite Pipeline</td>
+    <td>Fast GAN Compression</td>
     <td>0.355M</td>
     <td>2.64G</td>
     <td>65.19</td>
@@ -304,24 +295,24 @@ Here we show the performance of all our released models:
     <td>--</td>
   </tr>
   <tr>
-    <td>Full Pipeline (Paper)</td>
+    <td>GAN Compression (Paper)</td>
     <td>0.700M</td>
     <td>4.81G</td>
     <td>26.60</td>
     <td>--</td>
   </tr>
   <tr>
-    <td>Full Pipeline (Retrained)</td>
+    <td>GAN Compression (Retrained)</td>
     <td>0.822M</td>
     <td>4.99G</td>
     <td>26.70</td>
     <td>--</td>
   </tr>
   <tr>
-    <td>Lite Pipeline</td>
+    <td>Fast GAN Compression</td>
     <td>0.756M</td>
     <td>4.61G</td>
-    <td>25.26</td>
+    <td>25.76</td>
     <td>--</td>
   </tr>
   <tr>
@@ -333,25 +324,25 @@ Here we show the performance of all our released models:
     <td>42.06</td>
   </tr>
   <tr>
-    <td>Full Pipeline (Paper)</td>
+    <td>GAN Compression (Paper)</td>
     <td>0.707M</td>
     <td>5.66G</td>
-    <td>72.24</td>
+    <td>--</td>
     <td>40.77</td>
   </tr>
   <tr>
-    <td>Full Pipeline (Retrained)</td>
+    <td>GAN Compression (Retrained)</td>
     <td>0.781M</td>
     <td>5.59G</td>
-    <td>73.45</td>
+    <td>--</td>
     <td>38.63</td>
   </tr>
   <tr>
-    <td>Lite Pipeline</td>
+    <td>Fast GAN Compression</td>
     <td>0.867M</td>
     <td>5.61G</td>
-    <td>65.23</td>
-    <td>39.09</td>
+    <td>--</td>
+    <td>41.71</td>
   </tr>
   <tr>
     <td rowspan="3">map→arial photo<br></td>
@@ -362,17 +353,17 @@ Here we show the performance of all our released models:
     <td>--</td>
   </tr>
   <tr>
-    <td>Full Pipeline</td>
+    <td>GAN Compression</td>
     <td>0.746M</td>
     <td>4.68G</td>
     <td>48.02</td>
     <td>--</td>
   </tr>
   <tr>
-    <td>Lite Pipeline</td>
+    <td>Fast GAN Compression</td>
     <td>0.708M</td>
     <td>4.53G</td>
-    <td>48.38</td>
+    <td>48.67</td>
     <td>--</td>
   </tr>
   <tr>
@@ -385,28 +376,28 @@ Here we show the performance of all our released models:
     <td>61.04</td>
   </tr>
   <tr>
-    <td>Full Pipeline (Paper)</td>
+    <td>GAN Compression (Paper)</td>
     <td>20.4M</td>
     <td>31.7G</td>
     <td>55.19</td>
     <td>61.22</td>
   </tr>
   <tr>
-    <td>Full Pipeline (Retrained)</td>
+    <td>GAN Compression (Retrained)</td>
     <td>21.0M</td>
     <td>31.2G</td>
     <td>56.43</td>
     <td>60.29</td>
   </tr>
   <tr>
-    <td>Lite Pipeline</td>
+    <td>Fast GAN Compression</td>
     <td>20.2M</td>
     <td>31.3G</td>
     <td>56.25</td>
     <td>61.17</td>
   </tr>
   <tr>
-    <td rowspan="2">Coco-Stuff</td>
+    <td rowspan="2">COCO-Stuff</td>
     <td>Original</td>
     <td>97.5M</td>
     <td>191G</td>
@@ -414,7 +405,7 @@ Here we show the performance of all our released models:
     <td>38.78</td>
   </tr>
   <tr>
-    <td>Lite Pipeline</td>
+    <td>Fast GAN Compression</td>
     <td>26.0M</td>
     <td>35.5G</td>
     <td>25.06</td>
@@ -423,9 +414,10 @@ Here we show the performance of all our released models:
 </tbody>
 </table>
 
+
 ### Training
 
-Please refer to the [lite_pipeline.md](docs/lite_pipeline.md) and [full_pipeline.md](docs/full_pipeline.md) on how to train models on our datasets and your own.
+Please refer to the tutorial of [Fast GAN Compression](docs/tutorials/fast_gan_compression.md) and [GAN Compression](docs/tutorials/gan_compression.md) on how to train models on our datasets and your own.
 
 ### FID Computation
 
@@ -462,4 +454,3 @@ If you use this code for your research, please cite our [paper](https://arxiv.or
 Our code is developed based on [pytorch-CycleGAN-and-pix2pix](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) and [SPADE](https://github.com/NVlabs/SPADE).
 
 We also thank [pytorch-fid](https://github.com/mseitzer/pytorch-fid) for FID computation, [drn](https://github.com/fyu/drn) for cityscapes mIoU computation and [deeplabv2](https://github.com/kazuto1011/deeplab-pytorch) for Coco-Stuff mIoU computation.
-

@@ -11,6 +11,8 @@ from metric.fid_score import _compute_statistics_of_ims
 from metric.inception import InceptionV3
 from utils import util
 
+import os
+
 
 def main(opt):
     dataloader = create_dataloader(opt)
@@ -31,6 +33,7 @@ def main(opt):
     tensors = torch.cat(tensors, dim=0)
     tensors = util.tensor2im(tensors).astype(float)
     mu, sigma = _compute_statistics_of_ims(tensors, inception_model, 32, 2048, device)
+    os.makedirs(os.path.dirname(opt.output_path), exist_ok=True)
     np.savez(opt.output_path, mu=mu, sigma=sigma)
 
 
@@ -68,8 +71,8 @@ if __name__ == '__main__':
     opt.load_in_memory = False
     opt.isTrain = False
     if opt.dataset_mode == 'single' and opt.direction == 'AtoB':
-        warnings.warn('Dataset mode [single] only supports direction BtoA. '
-                      'We will change the direction to BtoA.!')
+        warnings.warn('Dataset mode [single] needs direction to be BtoA. '
+                      'We will change the direction to BtoA! (it won\'t affect the result)')
         opt.direction = 'BtoA'
 
 

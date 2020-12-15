@@ -11,8 +11,10 @@ from data import create_eval_dataloader
 from metric import create_metric_models
 from models import networks
 from models.base_model import BaseModel
+from models.modules.loss import GANLoss
 from models.modules.super_modules import SuperConv2d
 from utils import util
+from argparse import ArgumentParser
 
 
 class BaseResnetDistiller(BaseModel):
@@ -20,28 +22,7 @@ class BaseResnetDistiller(BaseModel):
     def modify_commandline_options(parser, is_train):
         assert is_train
         parser = super(BaseResnetDistiller, BaseResnetDistiller).modify_commandline_options(parser, is_train)
-        parser.add_argument('--teacher_netG', type=str, default='mobile_resnet_9blocks',
-                            help='specify teacher generator architecture',
-                            choices=['resnet_9blocks', 'mobile_resnet_9blocks',
-                                     'super_mobile_resnet_9blocks', 'sub_mobile_resnet_9blocks'])
-        parser.add_argument('--student_netG', type=str, default='mobile_resnet_9blocks',
-                            help='specify student generator architecture',
-                            choices=['resnet_9blocks', 'mobile_resnet_9blocks',
-                                     'super_mobile_resnet_9blocks', 'sub_mobile_resnet_9blocks'])
-        parser.add_argument('--teacher_ngf', type=int, default=64,
-                            help='the base number of filters of the teacher generator')
-        parser.add_argument('--student_ngf', type=int, default=48,
-                            help='the base number of filters of the student generator')
-        parser.add_argument('--restore_teacher_G_path', type=str, required=True,
-                            help='the path to restore the teacher generator')
-        parser.add_argument('--restore_student_G_path', type=str, default=None,
-                            help='the path to restore the student generator')
-        parser.add_argument('--restore_A_path', type=str, default=None,
-                            help='the path to restore the adaptors for distillation')
-        parser.add_argument('--restore_D_path', type=str, default=None,
-                            help='the path to restore the discriminator')
-        parser.add_argument('--restore_O_path', type=str, default=None,
-                            help='the path to restore the optimizer')
+        assert isinstance(parser, ArgumentParser)
         parser.add_argument('--recon_loss_type', type=str, default='l1',
                             choices=['l1', 'l2', 'smooth_l1', 'vgg'],
                             help='the type of the reconstruction loss')
@@ -53,47 +34,49 @@ class BaseResnetDistiller(BaseModel):
                             help='weight for gan loss')
         parser.add_argument('--teacher_dropout_rate', type=float, default=0)
         parser.add_argument('--student_dropout_rate', type=float, default=0)
-        parser.add_argument('--no_fid', action='store_true', help='No FID evaluation during training')
-        parser.add_argument('--no_mIoU', action='store_true', help='No mIoU evaluation during training '
-                                                                   '(sometimes because there are CUDA memory)')
+        parser.set_defaults(teacher_netG='mobile_resnet_9blocks', teacher_ngf=64,
+                            student_netG='mobile_resnet_9blocks', student_ngf=48)
         return parser
 
     def __init__(self, opt):
         assert opt.isTrain
+        valid_netGs = ['resnet_9blocks', 'mobile_resnet_9blocks',
+                       'super_mobile_resnet_9blocks', 'sub_mobile_resnet_9blocks']
+        assert opt.teacher_netG in valid_netGs and opt.student_netG in valid_netGs
         super(BaseResnetDistiller, self).__init__(opt)
         self.loss_names = ['G_gan', 'G_distill', 'G_recon', 'D_fake', 'D_real']
         self.optimizers = []
         self.image_paths = []
         self.visual_names = ['real_A', 'Sfake_B', 'Tfake_B', 'real_B']
         self.model_names = ['netG_student', 'netG_teacher', 'netD']
-        self.netG_teacher = networks.define_G(opt.input_nc, opt.output_nc, opt.teacher_ngf,
-                                              opt.teacher_netG, opt.norm, opt.teacher_dropout_rate,
-                                              opt.init_type, opt.init_gain, self.gpu_ids, opt=opt)
-        self.netG_student = networks.define_G(opt.input_nc, opt.output_nc, opt.student_ngf,
-                                              opt.student_netG, opt.norm, opt.student_dropout_rate,
-                                              opt.init_type, opt.init_gain, self.gpu_ids, opt=opt)
-
-        if getattr(opt, 'sort_channels', False) and opt.restore_student_G_path is not None:
-            self.netG_student_tmp = networks.define_G(opt.input_nc, opt.output_nc, opt.student_ngf,
-                                                      opt.student_netG.replace('super_', ''), opt.norm,
-                                                      opt.student_dropout_rate, opt.init_type, opt.init_gain,
-                                                      self.gpu_ids, opt=opt)
+        self.netG_teacher = networks.define_G(opt.teacher_netG, input_nc=opt.input_nc,
+                                              output_nc=opt.output_nc, ngf=opt.teacher_ngf,
+                                              norm=opt.norm, dropout_rate=opt.teacher_dropout_rate,
+                                              gpu_ids=self.gpu_ids, opt=opt)
+        self.netG_student = networks.define_G(opt.student_netG, input_nc=opt.input_nc,
+                                              output_nc=opt.output_nc, ngf=opt.student_ngf,
+                                              norm=opt.norm, dropout_rate=opt.student_dropout_rate,
+                                              init_type=opt.init_type, init_gain=opt.init_gain,
+                                              gpu_ids=self.gpu_ids, opt=opt)
         if hasattr(opt, 'distiller'):
-            self.netG_pretrained = networks.define_G(opt.input_nc, opt.output_nc, opt.pretrained_ngf,
-                                                     opt.pretrained_netG, opt.norm, 0,
-                                                     opt.init_type, opt.init_gain, self.gpu_ids, opt=opt)
-
+            self.netG_pretrained = networks.define_G(opt.pretrained_netG, input_nc=opt.input_nc,
+                                                     output_nc=opt.output_nc, ngf=opt.pretrained_ngf,
+                                                     norm=opt.norm, gpu_ids=self.gpu_ids, opt=opt)
         if opt.dataset_mode == 'aligned':
-            self.netD = networks.define_D(opt.input_nc + opt.output_nc, opt.ndf, opt.netD,
-                                          opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+            self.netD = networks.define_D(opt.netD, input_nc=opt.input_nc + opt.output_nc,
+                                          ndf=opt.ndf, n_layers_D=opt.n_layers_D, norm=opt.norm,
+                                          init_type=opt.init_type, init_gain=opt.init_gain,
+                                          gpu_ids=self.gpu_ids, opt=opt)
         elif opt.dataset_mode == 'unaligned':
-            self.netD = networks.define_D(opt.output_nc, opt.ndf, opt.netD,
-                                          opt.n_layers_D, opt.norm, opt.init_type, opt.init_gain, self.gpu_ids)
+            self.netD = networks.define_D(opt.netD, input_nc=opt.output_nc,
+                                          ndf=opt.ndf, n_layers_D=opt.n_layers_D, norm=opt.norm,
+                                          init_type=opt.init_type, init_gain=opt.init_gain,
+                                          gpu_ids=self.gpu_ids, opt=opt)
         else:
             raise NotImplementedError('Unknown dataset mode [%s]!!!' % opt.dataset_mode)
 
         self.netG_teacher.eval()
-        self.criterionGAN = models.modules.loss.GANLoss(opt.gan_mode).to(self.device)
+        self.criterionGAN = GANLoss(opt.gan_mode).to(self.device)
         if opt.recon_loss_type == 'l1':
             self.criterionRecon = torch.nn.L1Loss()
         elif opt.recon_loss_type == 'l2':
@@ -133,15 +116,12 @@ class BaseResnetDistiller(BaseModel):
         self.optimizers.append(self.optimizer_D)
 
         self.eval_dataloader = create_eval_dataloader(self.opt, direction=opt.direction)
-        self.inception_model, self.drn_model, de = create_metric_models(opt, device=self.device)
+        self.inception_model, self.drn_model, _ = create_metric_models(opt, device=self.device)
         self.npz = np.load(opt.real_stat_path)
         self.is_best = False
 
     def setup(self, opt, verbose=True):
-        self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
-        self.load_networks(verbose)
-        if verbose:
-            self.print_networks()
+        super(BaseResnetDistiller, self).setup(opt, verbose)
         if self.opt.lambda_distill > 0:
             def get_activation(mem, name):
                 def get_output_hook(module, input, output):
@@ -191,7 +171,20 @@ class BaseResnetDistiller(BaseModel):
         raise NotImplementedError
 
     def backward_G(self):
-        raise NotImplementedError
+        if self.opt.dataset_mode == 'aligned':
+            self.loss_G_recon = self.criterionRecon(self.Sfake_B, self.real_B) * self.opt.lambda_recon
+            fake = torch.cat((self.real_A, self.Sfake_B), 1)
+        else:
+            self.loss_G_recon = self.criterionRecon(self.Sfake_B, self.Tfake_B) * self.opt.lambda_recon
+            fake = self.Sfake_B
+        pred_fake = self.netD(fake)
+        self.loss_G_gan = self.criterionGAN(pred_fake, True, for_discriminator=False) * self.opt.lambda_gan
+        if self.opt.lambda_distill > 0:
+            self.loss_G_distill = self.calc_distill_loss() * self.opt.lambda_distill
+        else:
+            self.loss_G_distill = 0
+        self.loss_G = self.loss_G_gan + self.loss_G_recon + self.loss_G_distill
+        self.loss_G.backward()
 
     def optimize_parameters(self, steps):
         raise NotImplementedError
@@ -215,8 +208,6 @@ class BaseResnetDistiller(BaseModel):
         util.load_network(self.netG_teacher, self.opt.restore_teacher_G_path, verbose)
         if self.opt.restore_student_G_path is not None:
             util.load_network(self.netG_student, self.opt.restore_student_G_path, verbose)
-            if hasattr(self, 'netG_student_tmp'):
-                util.load_network(self.netG_student_tmp, self.opt.restore_student_G_path, verbose)
         if self.opt.restore_D_path is not None:
             util.load_network(self.netD, self.opt.restore_D_path, verbose)
         if self.opt.restore_A_path is not None:
@@ -227,8 +218,6 @@ class BaseResnetDistiller(BaseModel):
             for i, optimizer in enumerate(self.optimizers):
                 path = '%s-%d.pth' % (self.opt.restore_O_path, i)
                 util.load_optimizer(optimizer, path, verbose)
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] = self.opt.lr
 
     def save_networks(self, epoch):
 

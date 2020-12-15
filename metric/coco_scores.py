@@ -81,8 +81,8 @@ def test(fakes, names, model, device, data_dir, batch_size=1, num_workers=0, tqd
                             num_workers=num_workers, shuffle=False)
     preds, gts = [], []
     if tqdm_position is None or tqdm_position >= 0:
-        import tqdm
-        dataloader_tqdm = tqdm.tqdm(dataloader, desc='Coco Scores', position=tqdm_position, leave=False)
+        from tqdm import tqdm
+        dataloader_tqdm = tqdm(dataloader, desc='Coco Scores', position=tqdm_position, leave=False)
     else:
         dataloader_tqdm = dataloader
     with torch.no_grad():

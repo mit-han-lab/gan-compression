@@ -80,7 +80,10 @@ if __name__ == '__main__':
     model.setup(opt)
 
     web_dir = opt.results_dir  # define the website directory
-    webpage = html.HTML(web_dir, 'restore_G_path: %s' % (opt.restore_G_path))
+    if opt.model == 'munit_test':
+        webpage = html.HTML(web_dir, 'G_A_path: %s\tG_B_path: %s' % (opt.restore_G_A_path, opt.restore_G_B_path))
+    else:
+        webpage = html.HTML(web_dir, 'G_path: %s' % (opt.restore_G_path))
     fakes, names = [], []
     for i, data in enumerate(tqdm.tqdm(dataloader)):
         model.set_input(data)  # unpack data from data loader
