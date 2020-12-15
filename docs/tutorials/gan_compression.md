@@ -1,4 +1,4 @@
-# Training Tutorial
+# GAN Compression Training Tutorial
 ## Prerequisites
 
 * Linux
@@ -9,13 +9,13 @@
 
 ### Preparations
 
-Please refer to our [README](../README.md) for the installation, dataset preparations, and the evaluation (FID and mIoU).
+Please refer to our [README](../../README.md) for the installation, dataset preparations, and the evaluation (FID and mIoU).
 
 ### Pipeline
 
-Below we show the full pipeline for compressing pix2pix, cycleGAN and GauGAN models. **We provide pre-trained models after each step. You could use the pretrained models to skip some steps.** For more training details, please refer to [Appendix 6.1 Complete Pipeline](https://arxiv.org/pdf/2003.08936.pdf) of our paper.
+Below we show the full pipeline for compressing pix2pix, cycleGAN and GauGAN models. **We provide pre-trained models after each step. You could use the pretrained models to skip some steps.** 
 
-In fact, several steps including "Train a MobileNet Teacher Model", "Pre-distillation", and "Fine-tuning the Best Model" may be omitted from the whole pipeline. Please check [lite_pipeline.md](./lite_pipeline.md) for our lite pipeline (GAN Compression Lite).
+In fact, several steps including "Train a MobileNet Teacher Model", "Pre-distillation", and "Fine-tuning the Best Model" may be omitted from the whole pipeline. Please check [fast_gan_compression.md](fast_gan_compression.md) for our improved pipeline Fast GAN Compression. For more details about the differences between GAN Compression and Fast GAN Compression, please refer to [Section 4.1 Pipelines](https://arxiv.org/abs/2003.08936) of our paper.
 
 ## Pix2pix Model Compression
 
@@ -94,14 +94,14 @@ such as
 
 `'config_str'` is a channel configuration description to identify a specific subnet within the "once-for-all" network.
 
-To accelerate the search process, you may need to want to search the sub-networks on multiple GPUs. You could manually split the search space with [search.py](../search.py). All you need to do is add additional arguments `--num_splits` and `--split`. For example, if you need to search the sub-networks  with 2 GPUs, you could use the following commands:
+To accelerate the search process, you may need to want to search the sub-networks on multiple GPUs. You could manually split the search space with [search.py](../../search.py). All you need to do is add additional arguments `--num_splits` and `--split`. For example, if you need to search the sub-networks  with 2 GPUs, you could use the following commands:
 
 * On the first GPU:
 
   ```bash
   python search.py --dataroot database/edges2shoes-r \
     --restore_G_path logs/pix2pix/edges2shoes-r/supernet/checkpoints/latest_net_G.pth \
-    --output_path logs/pix2pix/edges2shoes-r/supernet/result.pkl \
+    --output_path logs/pix2pix/edges2shoes-r/supernet/pkls/result0.pkl \
     --ngf 48 --batch_size 32 \
     --config_set channels-48 \
     --real_stat_path real_stat/edges2shoes-r_B.npz \
@@ -113,21 +113,21 @@ To accelerate the search process, you may need to want to search the sub-network
   ```bash
   python search.py --dataroot database/edges2shoes-r \
     --restore_G_path logs/pix2pix/edges2shoes-r/supernet/checkpoints/latest_net_G.pth \
-    --output_path logs/pix2pix/edges2shoes-r/supernet/result.pkl \
+    --output_path logs/pix2pix/edges2shoes-r/supernet/pkls/result1.pkl \
     --ngf 48 --batch_size 32 \
     --config_set channels-48 \
     --real_stat_path real_stat/edges2shoes-r_B.npz \
     --num_splits 2 --split 1 --gpu_ids 1
   ```
 
-Then you could merge the search results with [merge.py](../merge.py)
+Then you could merge the search results with [merge.py](../../merge.py)
 
 ```bash
-python merge.py --input_dir logs/pix2pix/edges2shoes-r_lite/supernet-stage2/pkls \
+python merge.py --input_dir logs/pix2pix/edges2shoes-r/supernet/pkls \
   --output_path logs/cycle_gan/horse2zebra/supernet
 ```
 
-You could use our auxiliary script [select_arch.py](../select_arch.py) to select the architecture you want.
+You could use our auxiliary script [select_arch.py](../../select_arch.py) to select the architecture you want.
 
 ```shell
 python select_arch.py --macs 5.7e9 --fid 30 \  # macs <= 5.7e9(10x), fid >= 30
@@ -144,7 +144,7 @@ bash scripts/pix2pix/edges2shoes-r/finetune.sh 32_32_48_32_48_48_16_16
 
 ##### Export the Model
 
-Extract a subnet from the "once-for-all" network. We provide a code [export.py](../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `32_32_48_32_48_48_16_16`, then you can export the model by this command:
+Extract a subnet from the "once-for-all" network. We provide a code [export.py](../../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `32_32_48_32_48_48_16_16`, then you can export the model by this command:
 
 ```shell
 bash scripts/pix2pix/edges2shoes-r/export.sh 32_32_48_32_48_48_16_16
@@ -152,7 +152,7 @@ bash scripts/pix2pix/edges2shoes-r/export.sh 32_32_48_32_48_48_16_16
 
 ##### Cityscapes
 
-For the Cityscapes dataset, you need to specify additional options to support mIoU evaluation while training. Please refer to the scripts in [scripts/pix2pix/cityscapes](../scripts/pix2pix/cityscapes) for more details.
+For the Cityscapes dataset, you need to specify additional options to support mIoU evaluation while training. Please refer to the scripts in [scripts/pix2pix/cityscapes](../../scripts/pix2pix/cityscapes) for more details.
 
 ## CycleGAN Model Compression
 
@@ -219,9 +219,9 @@ Evaluate all the candidate sub-networks given a specific configuration
 ```shell
 bash scripts/cycle_gan/horse2zebra/search.sh
 ```
-To support multi-GPU search, you could manually split the search space with additional arguments `--num_splits` and `--split` and merge them with [merge.py](../merge.py), which is the same as pix2pix.
+To support multi-GPU search, you could manually split the search space with additional arguments `--num_splits` and `--split` and merge them with [merge.py](../../merge.py), which is the same as pix2pix.
 
-You could also use our auxiliary script [select_arch.py](../select_arch.py) to select the architecture you want. The usage is the same as pix2pix.
+You could also use our auxiliary script [select_arch.py](../../select_arch.py) to select the architecture you want. The usage is the same as pix2pix.
 
 ##### Fine-tuning the Best Model
 
@@ -235,7 +235,7 @@ During our experiments, we observe that fine-tuning the model on horse2zebra inc
 
 ##### Export the Model
 
-Extract a subnet from the supernet. We provide a code [export.py](../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `16_16_32_16_32_32_16_16`, then you can export the model by this command:
+Extract a subnet from the supernet. We provide a code [export.py](../../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `16_16_32_16_32_32_16_16`, then you can export the model by this command:
 
 ```shell
 bash scripts/cycle_gan/horse2zebra/export.sh 16_16_32_16_32_32_16_16
@@ -305,9 +305,9 @@ Evaluate all the candidate sub-networks given a specific configuration (e.g., MA
 ```shell
 bash scripts/gaugan/cityscapes/search.sh
 ```
-To support multi-GPU search, you could manually split the search space with additional arguments `--num_splits` and `--split` and merge them with [merge.py](../merge.py), which is the same as pix2pix.
+To support multi-GPU search, you could manually split the search space with additional arguments `--num_splits` and `--split` and merge them with [merge.py](../../merge.py), which is the same as pix2pix.
 
-You could also use our auxiliary script [select_arch.py](../select_arch.py) to select the architecture you want. The usage is the same as pix2pix.
+You could also use our auxiliary script [select_arch.py](../../select_arch.py) to select the architecture you want. The usage is the same as pix2pix.
 
 ##### Fine-tuning the Best Model
 
@@ -319,7 +319,7 @@ bash scripts/gaugan/cityscapes/finetune.sh 32_40_40_32_40_24_32_24
 
 ##### Export the Model
 
-Extract a subnet from the supernet. We provide a code [export.py](../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `32_40_40_32_40_24_32_24`, then you can export the model by this command:
+Extract a subnet from the supernet. We provide a code [export.py](../../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `32_40_40_32_40_24_32_24`, then you can export the model by this command:
 
 ```shell
 bash scripts/gaugan/cityscapes/export.sh 32_40_40_32_40_24_32_24
