@@ -3,10 +3,10 @@ from abc import ABC, abstractmethod
 from collections import OrderedDict
 
 import torch
-
-from utils import util
-from . import networks
 from torch.nn import DataParallel
+
+from models import networks
+from utils import util
 
 
 class BaseModel(ABC):
@@ -86,9 +86,9 @@ class BaseModel(ABC):
         Parameters:
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
+        self.load_networks(verbose=verbose)
         if self.isTrain:
             self.schedulers = [networks.get_scheduler(optimizer, opt) for optimizer in self.optimizers]
-        self.load_networks(verbose=verbose)
         if verbose:
             self.print_networks()
 
@@ -135,17 +135,24 @@ class BaseModel(ABC):
         """ Return image paths that are used to load current data"""
         return self.image_paths
 
-    def update_learning_rate(self, logger=None):
+    def update_learning_rate(self, epoch, total_iter, logger=None):
+        opt = logger.opt
+        old_lr = float(self.optimizers[0].param_groups[0]['lr'])
         for scheduler in self.schedulers:
             if self.opt.lr_policy == 'plateau':
                 scheduler.step(self.opt.metric)
             else:
                 scheduler.step()
         lr = self.optimizers[0].param_groups[0]['lr']
+
         if logger is not None:
-            logger.print_info('learning rate = %.7f\n' % lr)
+            if opt.scheduler_counter == 'epoch' or abs(old_lr - lr) >= 1e-12:
+                logger.print_info('(epoch: %d, iters: %d) learning rate = %.7f\n' % (epoch, total_iter, lr))
+            if opt.scheduler_counter == 'epoch' or total_iter % opt.print_freq == 0:
+                logger.plot({'lr': lr}, total_iter)
         else:
-            print('learning rate = %.7f' % lr)
+            if opt.scheduler_counter == 'epoch' or abs(old_lr - lr) >= 1e-12:
+                print('(epoch: %d, iters: %d) learning rate = %.7f\n' % (epoch, total_iter, lr))
 
     def get_current_visuals(self):
         """Return visualization images. train.py will display these images with visdom, and save the images to a HTML"""
@@ -185,6 +192,13 @@ class BaseModel(ABC):
             path = getattr(self.opt, 'restore_%s_path' % name, None)
             if path is not None:
                 util.load_network(net, path, verbose)
+        if self.isTrain:
+            if self.opt.restore_O_path is not None:
+                for i, optimizer in enumerate(self.optimizers):
+                    path = '%s-%d.pth' % (self.opt.restore_O_path, i)
+                    util.load_optimizer(optimizer, path, verbose)
+                    for param_group in optimizer.param_groups:
+                        param_group['lr'] = self.opt.lr
 
     def save_networks(self, epoch):
         for name in self.model_names:
@@ -200,6 +214,11 @@ class BaseModel(ABC):
                     net.cuda(self.gpu_ids[0])
                 else:
                     torch.save(net.cpu().state_dict(), save_path)
+        if self.isTrain:
+            for i, optimizer in enumerate(self.optimizers):
+                save_filename = '%s_optim-%d.pth' % (epoch, i)
+                save_path = os.path.join(self.save_dir, save_filename)
+                torch.save(optimizer.state_dict(), save_path)
 
     def set_requires_grad(self, nets, requires_grad=False):
         """Set requies_grad=Fasle for all the networks to avoid unnecessary computations
