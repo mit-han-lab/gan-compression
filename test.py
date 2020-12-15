@@ -1,22 +1,31 @@
 import copy
 import ntpath
 import os
+import random
 import sys
 import warnings
 
 import numpy as np
 import torch
 import tqdm
+from torch.backends import cudnn
 
 from configs import decode_config
 from data import create_dataloader
-from metric import create_metric_models
-from metric import get_cityscapes_mIoU
-from metric import get_coco_scores
-from metric import get_fid
+from metric import create_metric_models, get_cityscapes_mIoU, get_coco_scores, get_fid
 from models import create_model
 from options.test_options import TestOptions
 from utils import html, util
+
+
+def set_seed(seed):
+    cudnn.benchmark = False  # if benchmark=True, deterministic will be False
+    cudnn.deterministic = True
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def save_images(webpage, visuals, image_path, opt):
@@ -68,6 +77,7 @@ def check(opt):
 if __name__ == '__main__':
     opt = TestOptions().parse()
     print(' '.join(sys.argv))
+    set_seed(opt.seed)
     if opt.config_str is not None:
         assert 'super' in opt.netG or 'sub' in opt.netG
         config = decode_config(opt.config_str)
@@ -77,7 +87,7 @@ if __name__ == '__main__':
 
     dataloader = create_dataloader(opt)
     model = create_model(opt)
-    model.setup(opt)
+    model.setup(opt, verbose=False)
 
     web_dir = opt.results_dir  # define the website directory
     if opt.model == 'munit_test':
