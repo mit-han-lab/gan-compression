@@ -1,98 +1,26 @@
-import random
-
-
-class ResnetConfigs:
-    def __init__(self, n_channels, weights=None):
-        self.attributes = ['n_channels']
-        self.n_channels = n_channels
-        self.weights = weights
-
-    def sample(self, weighted_sample=1):
-        ret = {}
-        ret['channels'] = []
-        for n_channel in self.n_channels:
-            if weighted_sample > 1.0001:
-                now = (len(n_channel) - 1) / (weighted_sample - 1)
-                weights = []
-                while len(weights) < len(n_channel):
-                    weights.append(now)
-                    now += 1
-            else:
-                weights = None
-            ret['channels'].append(random.choices(n_channel, weights=weights)[0])
-        return ret
-
-    def sample_layer(self, layer):
-        return random.choice(self.n_channels[layer])
-
-    def largest(self):
-        ret = {}
-        ret['channels'] = []
-        for n_channel in self.n_channels:
-            ret['channels'].append(max(n_channel))
-        return ret
-
-    def smallest(self):
-        ret = {}
-        ret['channels'] = []
-        for n_channel in self.n_channels:
-            ret['channels'].append(min(n_channel))
-        return ret
-
-    def all_configs(self):
-
-        def yield_channels(i):
-            if i == len(self.n_channels):
-                yield []
-                return
-            for n in self.n_channels[i]:
-                for after_channels in yield_channels(i + 1):
-                    yield [n] + after_channels
-
-        for i, channels in enumerate(yield_channels(0)):
-            yield {'channels': channels}
-
-    def __call__(self, name):
-        assert name in ('largest', 'smallest')
-        if name == 'largest':
-            return self.largest()
-        elif name == 'smallest':
-            return self.smallest()
-        else:
-            raise NotImplementedError
-
-    def __str__(self):
-        ret = ''
-        for attr in self.attributes:
-            ret += 'attr: %s\n' % str(getattr(self, attr))
-        return ret
-
-    def __len__(self):
-        ret = 1
-        for n_channel in self.n_channels:
-            ret *= len(n_channel)
+from configs.channel_configs import ChannelConfigs
 
 
 def get_configs(config_name):
     if config_name == 'channels-48':
-        return ResnetConfigs(n_channels=[[48, 32], [48, 32], [48, 40, 32],
-                                         [48, 40, 32], [48, 40, 32], [48, 40, 32],
-                                         [48, 32, 24, 16], [48, 32, 24, 16]])
+        return ChannelConfigs(n_channels=[[48, 32], [48, 32], [48, 40, 32],
+                                          [48, 40, 32], [48, 40, 32], [48, 40, 32],
+                                          [48, 32, 24, 16], [48, 32, 24, 16]])
     elif config_name == 'channels-32':
-        return ResnetConfigs(n_channels=[[32, 24, 16], [32, 24, 16], [32, 24, 16],
-                                         [32, 24, 16], [32, 24, 16], [32, 24, 16],
-                                         [32, 24, 16], [32, 24, 16]])
+        return ChannelConfigs(n_channels=[[32, 24, 16], [32, 24, 16], [32, 24, 16],
+                                          [32, 24, 16], [32, 24, 16], [32, 24, 16],
+                                          [32, 24, 16], [32, 24, 16]])
     elif config_name == 'channels-64-cycleGAN':
-        return ResnetConfigs(n_channels=[[64, 48, 32, 24, 16], [64, 48, 32, 24, 16], [64, 48, 32, 24, 16],
-                                         [64, 48, 32, 24, 16], [64, 48, 32, 24, 16], [64, 48, 32, 24, 16],
-                                         [64, 48, 32, 24, 16], [64, 48, 32, 24, 16]])
+        return ChannelConfigs(n_channels=[[64, 48, 32, 24, 16], [64, 48, 32, 24, 16], [64, 48, 32, 24, 16],
+                                          [64, 48, 32, 24, 16], [64, 48, 32, 24, 16], [64, 48, 32, 24, 16],
+                                          [64, 48, 32, 24, 16], [64, 48, 32, 24, 16]])
     elif config_name == 'channels-64-pix2pix':
-        return ResnetConfigs(n_channels=[[64, 48, 32], [64, 48, 32], [64, 48, 40, 32],
-                                         [64, 48, 40, 32], [64, 48, 40, 32], [64, 48, 40, 32],
-                                         [64, 48, 32, 24, 16], [64, 48, 32, 24, 16]])
+        return ChannelConfigs(n_channels=[[64, 56, 48, 32, 24, 16], [64, 56, 48, 32, 24, 16], [64, 56, 48, 32, 24, 16],
+                                          [64, 56, 48, 32, 24, 16], [64, 56, 48, 32, 24, 16], [64, 56, 48, 32, 24, 16],
+                                          [64, 56, 48, 32, 24, 16], [64, 56, 48, 32, 24, 16]])
     elif config_name == 'test':
-        return ResnetConfigs(n_channels=[[8], [6, 8], [6, 8],
-                                         [8], [8], [8],
-                                         [8], [8]])
+        return ChannelConfigs(n_channels=[[8], [6, 8], [6, 8],
+                                          [8], [8], [8],
+                                          [8], [8]])
     else:
         raise NotImplementedError('Unknown configuration [%s]!!!' % config_name)
