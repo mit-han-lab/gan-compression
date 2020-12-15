@@ -6,12 +6,12 @@ import wget
 
 def check(opt):
     if opt.model == 'pix2pix':
-        assert opt.task in ['edges2shoes-r', 'map2sat', 'cityscapes', 'cityscapes_lite',
-                            'edges2shoes-r_lite', 'map2sat_lite']
+        assert opt.task in ['edges2shoes-r', 'map2sat', 'cityscapes', 'cityscapes_fast',
+                            'edges2shoes-r_fast', 'map2sat_fast']
     elif opt.model == 'cycle_gan':
-        assert opt.task in ['horse2zebra', 'horse2zebra_lite']
+        assert opt.task in ['horse2zebra', 'horse2zebra_fast']
     elif opt.model == 'gaugan':
-        assert opt.task in ['cityscapes', 'cityscapes_lite', 'coco_lite']
+        assert opt.task in ['cityscapes', 'cityscapes_lite', 'coco_fast']
     else:
         raise NotImplementedError('Unsupported model [%s]!' % opt.model)
 
