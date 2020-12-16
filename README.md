@@ -320,7 +320,7 @@ Here we show the performance of all our released models:
     <td>Original</td>
     <td>11.4M</td>
     <td>56.8G</td>
-    <td>61.50</td>
+    <td>--</td>
     <td>42.06</td>
   </tr>
   <tr>
