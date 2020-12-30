@@ -6,5 +6,5 @@ python train_supernet.py --dataroot database/coco_stuff --dataset_mode coco \
   --real_stat_path real_stat/coco_A.npz \
   --gpu_ids 0,1,2,3 \
   --nepochs 100 --nepochs_decay 0 \
-  --config_set channels-64 \
+  --config_set channels-64-coco \
   --num_upsampling_layers normal --batch_size 32 --save_epoch_freq 1
