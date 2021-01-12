@@ -52,81 +52,17 @@ python scripts/download_model.py --model pix2pix --task edges2shoes-r_fast --sta
 
 ##### Select the Best Model
 
-* **[New!!!]** Evolution Searching.
+The evolution searching uses the evolution algorithm to search for the best-performed subnet. It is much much faster than the brute force searching. You could run:
 
-  The evolution searching uses the evolution algorithm to search for the best-performed subnet. It is much much faster than the brute force searching. You could run:
+```bash
+bash scripts/pix2pix/edges2shoes-r_fast/evolution_search.sh
+```
 
-  ```bash
-  bash scripts/pix2pix/edges2shoes-r_fast/evolution_search.sh
-  ```
+It will directly tells you the information of the best-performed subnet which satisfies the computation budget in the following format:
 
-  It will directly tells you the information of the best-performed subnet which satisfies the computation budget in the following format:
-
-  ```
-  {config_str: $config_str, macs: $macs, fid/mIoU: $fid_or_mIoU}
-  ```
-
-* **[Previous]** Brute Force Searching.
-
-  The brute force searching would evolution all the candidate sub-networks meeting the computation budget given a specific searching space. It is much more slower that the evolution searching. You could run:
-
-  ```shell
-  bash scripts/pix2pix/edges2shoes-r_fast/search.sh
-  ```
-
-  The search result will be stored in the python `pickle` form. The pickle file is a python `list` object that stores all the candidate sub-networks information, whose element is a python `dict ` object in the form of
-
-  ```
-  {'config_str': $config_str, 'macs': $macs, 'fid'/'mIoU': $fid_or_mIoU}
-  ```
-
-  such as
-
-  ```python
-  {'config_str': '32_32_48_40_64_40_16_32', 'macs': 5761662976, 'fid': 30.594936138634836}
-  ```
-
-  `'config_str'` is a channel configuration description to identify a specific subnet within the "once-for-all" network.
-
-  To accelerate the search process, you may need to want to search the sub-networks on multiple GPUs. You could manually split the search space with [search.py](../../search.py). All you need to do is add additional arguments `--num_splits` and `--split`. For example, if you need to search the sub-networks  with 2 GPUs, you could use the following commands:
-
-  * On the first GPU:
-
-    ```bash
-    python search.py --dataroot database/edges2shoes-r \
-      --restore_G_path logs/pix2pix/edges2shoes-r_fast/supernet/checkpoints/latest_net_G.pth \
-      --output_path logs/pix2pix/edges2shoes-r_fast/supernet/pkls/result0.pkl \
-      --ngf 64 --batch_size 32 \
-      --config_set channels-64-pix2pix \
-      --real_stat_path real_stat/edges2shoes-r_B.npz --load_in_memory --budget 6.5e9 \
-      --num_splits 2 --split 0
-    ```
-
-  * On the second GPU:
-
-    ```bash
-    python search.py --dataroot database/edges2shoes-r \
-      --restore_G_path logs/pix2pix/edges2shoes-r_fast/supernet/checkpoints/latest_net_G.pth \
-      --output_path logs/pix2pix/edges2shoes-r_fast/supernet/pkls/result1.pkl \
-      --ngf 64 --batch_size 32 \
-      --config_set channels-64-pix2pix \
-      --real_stat_path real_stat/edges2shoes-r_B.npz --load_in_memory --budget 6.5e9 \
-      --num_splits 2 --split 1 --gpu_ids 1
-    ```
-
-  Then you could merge the search results with [merge.py](../../merge.py)
-
-  ```bash
-  python merge.py --input_dir logs/pix2pix/edges2shoes-r_fast/supernet/pkls \
-    --output_path logs/cycle_gan/horse2zebra/supernet
-  ```
-
-  Once you get the search results, you could use our auxiliary script [select_arch.py](../../select_arch.py) to select the architecture you want.
-
-  ```shell
-  python select_arch.py --macs 6.5e9 --fid 32 \ 
-    --pkl_path logs/pix2pix/edges2shoes-r/supernet/result.pkl
-  ```
+```
+{config_str: $config_str, macs: $macs, fid/mIoU: $fid_or_mIoU}
+```
 
 ##### Fine-tuning the Best Model
 
@@ -188,20 +124,9 @@ python scripts/download_model.py --model cycle_gan --task horse2zebra_fast --sta
 
 This stage is almost the same as pix2pix.
 
-* **[New!!!]** Evolution Searching.
-
-  ```bash
-  bash scripts/cycle_gan/horse2zebra_fast/evolution_search.sh
-  ```
-
-
-* **[Previous]** Brute Force Searching.
-
-  ```shell
-bash scripts/cycle_gan/horse2zebra_fast/search.sh
-  ```
-  
-  You could also use our auxiliary script [select_arch.py](../select_arch.py) to select the architecture you want. The usage is the same as pix2pix.
+```bash
+bash scripts/cycle_gan/horse2zebra_fast/evolution_search.sh
+```
 
 ##### Fine-tuning the Best Model
 
@@ -265,20 +190,9 @@ python scripts/download_model.py --model gaugan --task cityscapes_fast --stage s
 
 This stage is almost the same as pix2pix.
 
-* **[New!!!]** Evolution Searching.
-
-  ```bash
-  bash scripts/gaugan/cityscapes_fast/evolution_search.sh
-  ```
-
-
-* **[Previous]** Brute Force Searching.
-
-  ```shell
-bash scripts/gaugan/cityscapes_fast/search.sh
-  ```
-  
-  You could also use our auxiliary script [select_arch.py](../select_arch.py) to select the architecture you want. The usage is the same as pix2pix.
+```bash
+bash scripts/gaugan/cityscapes_fast/evolution_search.sh
+```
 
 ##### Fine-tuning the Best Model
 
@@ -294,4 +208,62 @@ Extract a subnet from the supernet. We provide a code [export.py](../../export.p
 
 ```shell
 bash scripts/gaugan/cityscapes_fast/export.sh 32_32_32_48_32_24_24_32
+```
+
+## MUNIT Model Compression
+
+The pipeline is almost identical to pix2pix. We will show the pipeline on `edges2shoes-r-unaligned` dataset.
+
+##### Train an Original Full Teacher Model (if you already have the full model, you could skip it)
+
+Train an original full teacher model from scratch.
+
+```shell
+bash scripts/munit/edges2shoes-r_fast/train_full.sh
+```
+
+We provide a pre-trained teacher model for each dataset. You could download the model using
+
+```shell
+python scripts/download_model.py --model munit --task edges2shoes-r_fast --stage full
+```
+
+and test the model by
+
+```shell
+bash scripts/munit/edges2shoes-r_fast/test_full.sh
+```
+
+##### "Once-for-all" Network Training
+
+Train a "once-for-all" network from scratch to search for the efficient architectures.
+
+```shell
+bash scripts/munit/edges2shoes-r_fast/train_supernet.sh
+```
+
+We provide a pre-trained once-for-all network for each dataset. You could download the model by
+
+```shell
+python scripts/download_model.py --model munit --task edges2shoes-r_fast --stage supernet
+```
+
+##### Select the Best Model
+
+This stage is almost the same as pix2pix.
+
+```bash
+bash scripts/munit/edges2shoes-r_fast/evolution_search.sh
+```
+
+##### Fine-tuning the Best Model
+
+During our experiments, we observe that fine-tuning the model increases FID.  **You may skip the fine-tuning.**
+
+##### Export the Model
+
+Extract a subnet from the supernet. We provide a code [export.py](../../export.py) to extract a specific subnet according to a configuration description. For example, if the `config_str` of your chosen subnet is `16_16_16_24_56_16_40_40_32_24`, then you can export the model by this command:
+
+```shell
+bash scripts/munit/edges2shoes-r_fast/export.sh 16_16_16_24_56_16_40_40_32_24
 ```

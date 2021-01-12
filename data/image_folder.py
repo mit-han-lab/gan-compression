@@ -29,33 +29,28 @@ def make_dataset_rec(dir, images):
                 images.append(path)
 
 
-def make_dataset(dir, max_dataset_size=float("inf"), recursive=False, read_cache=False, write_cache=False):
+def make_dataset(dir, max_dataset_size=float("inf"), recursive=False, meta_path=None, write_cache=False):
     images = []
 
-    if read_cache:
-        possible_filelist = os.path.join(dir, 'files.list')
-        if os.path.isfile(possible_filelist):
-            with open(possible_filelist, 'r') as f:
-                images = f.read().splitlines()
-                return images
-
-    if recursive:
-        make_dataset_rec(dir, images)
+    if meta_path is not None:
+        with open(meta_path, 'r') as f:
+            lines = f.readlines()
+        from tqdm import tqdm
+        for line in tqdm(lines):
+            line = line.strip()
+            if len(line) > 0 and is_image_file(line):
+                images.append(os.path.join(dir, line))
     else:
-        assert os.path.isdir(dir) or os.path.islink(dir), '%s is not a valid directory' % dir
+        if recursive:
+            make_dataset_rec(dir, images)
+        else:
+            assert os.path.isdir(dir) or os.path.islink(dir), '%s is not a valid directory' % dir
 
-        for root, dnames, fnames in sorted(os.walk(dir)):
-            for fname in fnames:
-                if is_image_file(fname):
-                    path = os.path.join(root, fname)
-                    images.append(path)
-
-    if write_cache:
-        filelist_cache = os.path.join(dir, 'files.list')
-        with open(filelist_cache, 'w') as f:
-            for path in images:
-                f.write("%s\n" % path)
-            print('wrote filelist cache at %s' % filelist_cache)
+            for root, dnames, fnames in sorted(os.walk(dir)):
+                for fname in fnames:
+                    if is_image_file(fname):
+                        path = os.path.join(root, fname)
+                        images.append(path)
 
     if max_dataset_size == -1:
         return images

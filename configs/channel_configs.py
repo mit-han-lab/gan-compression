@@ -7,16 +7,24 @@ class ChannelConfigs:
         self.n_channels = n_channels
         self.weights = weights
 
-    def sample(self, weighted_sample=1):
+    def sample(self, weighted_sample=1, weight_strategy='arithmetic'):
         ret = {}
         ret['channels'] = []
         for n_channel in self.n_channels:
             if weighted_sample > 1.0001:
-                now = (len(n_channel) - 1) / (weighted_sample - 1)
                 weights = []
-                while len(weights) < len(n_channel):
-                    weights.append(now)
-                    now += 1
+                if weight_strategy == 'arithmetic':
+                    now = (len(n_channel) - 1) / (weighted_sample - 1)
+                    while len(weights) < len(n_channel):
+                        weights.append(now)
+                        now += 1
+                elif weight_strategy == 'geometric':
+                    now = 1
+                    while len(weights) < len(n_channel):
+                        weights.append(now)
+                        now *= weighted_sample
+                else:
+                    raise NotImplementedError('Unknown weight strategy [%s]!!!' % weight_strategy)
             else:
                 weights = None
             ret['channels'].append(random.choices(n_channel, weights=weights)[0])

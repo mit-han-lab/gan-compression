@@ -60,18 +60,22 @@ def get_scheduler(optimizer, opt):
     For other schedulers (step, plateau, and cosine), we use the default PyTorch schedulers.
     See https://pytorch.org/docs/stable/optim.html for more details.
     """
+    if opt.scheduler_counter == 'epoch':
+        last_epoch = opt.epoch_base - 2
+    else:
+        last_epoch = opt.iter_base - 1
     if opt.lr_policy == 'linear':
         def lambda_rule(epoch):
             lr_l = 1.0 - max(0, epoch + 1 - opt.nepochs) / float(opt.nepochs_decay + 1)
             return lr_l
 
-        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
+        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule, last_epoch=last_epoch)
     elif opt.lr_policy == 'step':
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_steps, gamma=opt.gamma)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_steps, gamma=opt.gamma, last_epoch=last_epoch)
     elif opt.lr_policy == 'plateau':
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
     elif opt.lr_policy == 'cosine':
-        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt.niter, eta_min=0)
+        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt.niter, eta_min=0, last_epoch=last_epoch)
     else:
         return NotImplementedError('learning rate policy [%s] is not implemented', opt.lr_policy)
     return scheduler
@@ -159,12 +163,11 @@ def define_G(netG, **kwargs):
         config = decode_config(opt.config_str)
         net = Generator(input_nc, output_nc, config, norm_layer=norm_layer,
                         dropout_rate=dropout_rate, n_blocks=9)
-    elif netG in ['spade', 'mobile_spade', 'super_mobile_spade', 'munit', 'mobile_munit', 'mobile_munit2',
-                  'mobile_munit3']:
+    elif netG in ['spade', 'mobile_spade', 'super_mobile_spade', 'munit', 'super_munit', 'super_mobile_munit']:
         assert 'opt' in kwargs
         opt = kwargs.get('opt')
         net = Generator(opt)
-    elif netG == 'sub_mobile_spade':
+    elif netG in ['sub_mobile_spade', 'sub_mobile_munit']:
         assert 'opt' in kwargs
         opt = kwargs.get('opt')
         assert opt.config_str is not None
@@ -240,6 +243,18 @@ def get_netG_cls(netG):
     elif netG == 'sub_mobile_spade':
         from models.modules.spade_architecture.sub_mobile_spade_generator import SubMobileSPADEGenerator
         return SubMobileSPADEGenerator
+    elif netG == 'munit':
+        from models.modules.munit_architecture.munit_generator import AdaINGenerator
+        return AdaINGenerator
+    elif netG == 'super_munit':
+        from models.modules.munit_architecture.super_munit_generator import SuperAdaINGenerator
+        return SuperAdaINGenerator
+    elif netG == 'super_mobile_munit':
+        from models.modules.munit_architecture.super_mobile_munit_generator import SuperMobileAdaINGenerator
+        return SuperMobileAdaINGenerator
+    elif netG == 'sub_mobile_munit':
+        from models.modules.munit_architecture.sub_mobile_munit_generator import SubMobileAdaINGenerator
+        return SubMobileAdaINGenerator
     else:
         raise NotImplementedError('Generator model name [%s] is not recognized' % netG)
 
@@ -254,6 +269,9 @@ def get_netD_cls(netD):
     elif netD == 'multi_scale':
         from models.modules.discriminators import MultiscaleDiscriminator
         return MultiscaleDiscriminator
+    elif netD == 'ms_image':
+        from models.modules.discriminators import MsImageDiscriminator
+        return MsImageDiscriminator
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' % netD)
 

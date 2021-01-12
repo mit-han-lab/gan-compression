@@ -5,8 +5,43 @@ import numpy as np
 from torch import nn
 from torch.nn import functional as F
 
+from models.modules.munit_architecture.munit_generator import Conv2dBlock
+from models.modules.spade_architecture.normalization import get_nonspade_norm_layer
 from models.networks import BaseNetwork
-from .spade_architecture.normalization import get_nonspade_norm_layer
+
+
+class MsImageDiscriminator(nn.Module):
+    def __init__(self, input_dim, opt):
+        super(MsImageDiscriminator, self).__init__()
+        self.n_layer = opt.n_layers_D
+        self.dim = opt.ndf
+        self.norm = 'none'
+        self.activ = 'lrelu'
+        self.num_scales = 3
+        self.pad_type = 'reflect'
+        self.input_dim = input_dim
+        self.downsample = nn.AvgPool2d(3, stride=2, padding=[1, 1], count_include_pad=False)
+        self.cnns = nn.ModuleList()
+        for _ in range(self.num_scales):
+            self.cnns.append(self._make_net())
+
+    def _make_net(self):
+        dim = self.dim
+        cnn_x = []
+        cnn_x += [Conv2dBlock(self.input_dim, dim, 4, 2, 1, norm='none', activation=self.activ, pad_type=self.pad_type)]
+        for i in range(self.n_layer - 1):
+            cnn_x += [Conv2dBlock(dim, dim * 2, 4, 2, 1, norm=self.norm, activation=self.activ, pad_type=self.pad_type)]
+            dim *= 2
+        cnn_x += [nn.Conv2d(dim, 1, 1, 1, 0)]
+        cnn_x = nn.Sequential(*cnn_x)
+        return cnn_x
+
+    def forward(self, x):
+        outputs = []
+        for model in self.cnns:
+            outputs.append(model(x))
+            x = self.downsample(x)
+        return outputs
 
 
 class NLayerDiscriminator(BaseNetwork):
@@ -31,7 +66,6 @@ class NLayerDiscriminator(BaseNetwork):
         padw = 1
         sequence = [nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw), nn.LeakyReLU(0.2, True)]
         nf_mult = 1
-        nf_mult_prev = 1
         for n in range(1, n_layers):  # gradually increase the number of filters
             nf_mult_prev = nf_mult
             nf_mult = min(2 ** n, 8)

@@ -36,8 +36,6 @@ def check(opt):
     assert opt.no_flip
     assert opt.load_size == opt.crop_size
     assert opt.config_set is not None
-    if opt.phase == 'train':
-        warnings.warn('You are using training set for evaluation.')
     warnings.filterwarnings("ignore")
 
 
@@ -74,6 +72,8 @@ class EvolutionSearcher:
             from configs.resnet_configs import get_configs
         elif 'spade' in opt.netG:
             from configs.spade_configs import get_configs
+        elif 'munit' in opt.netG:
+            from configs.munit_configs import get_configs
         else:
             raise NotImplementedError
         self.configs = get_configs(config_name=opt.config_set)
@@ -92,9 +92,15 @@ class EvolutionSearcher:
         self.macs_cache = {}
         self.result_cache = {}
 
+        self.log_file = open(os.path.join(opt.output_dir, 'log.txt'), 'a')
+        now = time.strftime('%c')
+        self.log_file.write('================ (%s) ================\n' % now)
+        self.log_file.flush()
+
     def random_sample(self):
         while True:
-            sample = self.configs.sample(weighted_sample=self.opt.weighted_sample)
+            sample = self.configs.sample(weighted_sample=self.opt.weighted_sample,
+                                         weight_strategy=self.opt.weight_strategy)
             macs, _ = self.model.profile(sample, verbose=False)
             macs = self.macs_cache.get(encode_config(sample))
             if macs is None:
@@ -154,7 +160,8 @@ class EvolutionSearcher:
                                             opt.batch_size, tqdm_position=2)
                 if self.drn_model is not None:
                     result['mIoU'] = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
-                                                         data_dir=opt.cityscapes_path, batch_size=opt.batch_size,
+                                                         table_path=opt.table_path,
+                                                         data_dir=opt.cityscapes_path, batch_size=2,  # 2 is the fastest
                                                          num_workers=opt.num_threads, tqdm_position=2)
                 if self.deeplabv2_model is not None:
                     torch.cuda.empty_cache()
@@ -227,6 +234,8 @@ class EvolutionSearcher:
                 best_valids.append(performance[opt.criterion])
                 best_infos.append(parents[0])
             evolution_tqdm.write('Iter %d: %s' % (iter, dict2str(tuple2item(best_infos[-1]))))
+            self.log_file.write('Iter %d: %s\n' % (iter, dict2str(tuple2item(best_infos[-1]))))
+            self.log_file.flush()
             population = parents
             child_pool, macs_pool = [], []
             for __ in trange(mutation_numbers, desc='Mutation   ', position=1, leave=False):

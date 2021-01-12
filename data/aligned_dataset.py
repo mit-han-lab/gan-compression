@@ -4,6 +4,7 @@ from PIL import Image
 
 from data.base_dataset import BaseDataset, get_params, get_transform
 from data.image_folder import make_dataset
+import argparse
 
 
 class AlignedDataset(BaseDataset):
@@ -13,6 +14,14 @@ class AlignedDataset(BaseDataset):
     During test time, you need to prepare a directory '/path/to/data/test'.
     """
 
+    @staticmethod
+    def modify_commandline_options(parser, is_train):
+        parser = BaseDataset.modify_commandline_options(parser, is_train)
+        assert isinstance(parser, argparse.ArgumentParser)
+        parser.add_argument('--meta_path', type=str, default=None,
+                            help='the path to the meta file')
+        return parser
+
     def __init__(self, opt):
         """Initialize this dataset class.
 
@@ -20,9 +29,9 @@ class AlignedDataset(BaseDataset):
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
         BaseDataset.__init__(self, opt)
+        meta_path = opt.meta_path if opt.phase == 'train' else None
         self.dir_AB = os.path.join(opt.dataroot, opt.phase)  # get the image directory
-        self.AB_paths = sorted(make_dataset(self.dir_AB))  # get image paths
-        # print(self.AB_paths)
+        self.AB_paths = sorted(make_dataset(self.dir_AB, opt.max_dataset_size, meta_path=meta_path))  # get image paths
 
         assert (self.opt.load_size >= self.opt.crop_size)  # crop_size should be smaller than the size of loaded image
         self.input_nc = self.opt.output_nc if self.opt.direction == 'BtoA' else self.opt.input_nc

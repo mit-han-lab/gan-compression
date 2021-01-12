@@ -89,7 +89,10 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, required=True,
                         default='database/cityscapes-origin',
                         help='Directory the output images will be written to.')
-    parser.add_argument('--table_path', type=str, default='datasets/table.txt',
+    parser.add_argument('--train_table_path', type=str, default='datasets/train_table.txt',
+                        help='Generate a mapping table to map the generated images to the original images. '
+                             'The table will be used for mAP computation.')
+    parser.add_argument('--val_table_path', type=str, default='datasets/val_table.txt',
                         help='Generate a mapping table to map the generated images to the original images. '
                              'The table will be used for mAP computation.')
     opt = parser.parse_args()
@@ -98,9 +101,9 @@ if __name__ == '__main__':
 
     print('Preparing Cityscapes Dataset for val phase')
     process_cityscapes(opt.gtFine_dir, opt.leftImg8bit_dir,
-                       opt.output_dir, "val", table_path=opt.table_path)
+                       opt.output_dir, "val", table_path=opt.val_table_path)
     print('Preparing Cityscapes Dataset for train phase')
     process_cityscapes(opt.gtFine_dir, opt.leftImg8bit_dir,
-                       opt.output_dir, "train")
+                       opt.output_dir, "train", table_path=opt.train_table_path)
 
     print('Done')

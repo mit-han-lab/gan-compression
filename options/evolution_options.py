@@ -26,7 +26,6 @@ class EvolutionOptions(BaseOptions):
                             help='whether you want to compute mIoU.')
 
         parser.add_argument('--netG', type=str, default='super_mobile_resnet_9blocks',
-                            choices=['super_mobile_resnet_9blocks', 'super_mobile_spade'],
                             help='specify generator architecture')
         parser.add_argument('--ngf', type=int, default=48,
                             help='the base number of filters of the student generator')
@@ -52,9 +51,10 @@ class EvolutionOptions(BaseOptions):
                             help='the criterion for the performance',
                             choices=['fid', 'mIoU', 'accu'])
         parser.add_argument('--weighted_sample', type=float, default=1,
-                            help='number of times of the probability of the smallest channel to '
-                                 'that of the largest channel in a single layer. '
+                            help='a weight parameter to configure the sampling of the first generation'
                                  '(only affect the first generation)')
+        parser.add_argument('--weight_strategy', type=str, default='arithmetic', choices=['arithmetic', 'geometric'],
+                            help='use arithmetic weights or geometric weights to sample the first generation')
         parser.add_argument('--generation_base', type=int, default=1,
                             help='the generation base of the evolution (used for resuming)')
         parser.add_argument('--restore_pkl_path', type=str, default=None,

@@ -18,7 +18,7 @@ def get_fid(fakes, model, npz, device, batch_size=1, tqdm_position=None):
 
 
 def get_cityscapes_mIoU(fakes, names, model, device,
-                        table_path='datasets/table.txt',
+                        table_path='datasets/val_table.txt',
                         data_dir='database/cityscapes',
                         batch_size=1, num_workers=8, num_classes=19,
                         tqdm_position=None):

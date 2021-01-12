@@ -1,3 +1,4 @@
+import argparse
 import os.path
 import random
 
@@ -18,6 +19,16 @@ class UnalignedDataset(BaseDataset):
     '/path/to/data/testA' and '/path/to/data/testB' during test time.
     """
 
+    @staticmethod
+    def modify_commandline_options(parser, is_train):
+        parser = BaseDataset.modify_commandline_options(parser, is_train)
+        assert isinstance(parser, argparse.ArgumentParser)
+        parser.add_argument('--metaA_path', type=str, default=None,
+                            help='the path to the meta file of directory A')
+        parser.add_argument('--metaB_path', type=str, default=None,
+                            help='the path to the meta file of directory B')
+        return parser
+
     def __init__(self, opt):
         """Initialize this dataset class.
 
@@ -29,8 +40,10 @@ class UnalignedDataset(BaseDataset):
         self.dir_A = os.path.join(opt.dataroot, opt.phase + 'A')  # create a path '/path/to/data/trainA'
         self.dir_B = os.path.join(opt.dataroot, opt.phase + 'B')  # create a path '/path/to/data/trainB'
 
-        self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size))  # load images from '/path/to/data/trainA'
-        self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size))  # load images from '/path/to/data/trainB'
+        self.A_paths = sorted(make_dataset(self.dir_A, opt.max_dataset_size,
+                                           meta_path=opt.metaA_path if opt.phase == 'train' else None))
+        self.B_paths = sorted(make_dataset(self.dir_B, opt.max_dataset_size,
+                                           meta_path=opt.metaB_path if opt.phase == 'train' else None))
         self.A_size = len(self.A_paths)  # get the size of dataset A
         self.B_size = len(self.B_paths)  # get the size of dataset B
         btoA = self.opt.direction == 'BtoA'

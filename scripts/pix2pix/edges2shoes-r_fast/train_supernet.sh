@@ -7,5 +7,5 @@ python train_supernet.py --dataroot database/edges2shoes-r \
   --real_stat_path real_stat/edges2shoes-r_B.npz \
   --nepochs 10 --nepochs_decay 30 \
   --teacher_ngf 64 --student_ngf 64 \
-  --config_set channels-64-pix2pix
+  --config_set channels-64-pix2pix --meta_path datasets/metas/edges2shoes-r/train1.meta
 

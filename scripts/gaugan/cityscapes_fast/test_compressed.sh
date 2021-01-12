@@ -8,4 +8,4 @@ python test.py --dataroot database/cityscapes-origin \
   --real_stat_path real_stat/cityscapes_A.npz \
   --drn_path drn-d-105_ms_cityscapes.pth \
   --cityscapes_path database/cityscapes-origin \
-  --table_path datasets/table.txt --need_profile
+  --table_path datasets/val_table.txt --need_profile

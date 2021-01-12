@@ -73,7 +73,7 @@ class Trainer:
         logger = self.logger
 
         start_epoch = opt.epoch_base
-        end_epoch = opt.epoch_base + opt.nepochs + opt.nepochs_decay - 1
+        end_epoch = opt.nepochs + opt.nepochs_decay
         total_iter = opt.iter_base
         epoch_tqdm = trange(start_epoch, end_epoch + 1, desc='Epoch      ', position=0, leave=False)
         self.logger.set_progress_bar(epoch_tqdm)

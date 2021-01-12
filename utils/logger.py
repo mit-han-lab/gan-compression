@@ -37,6 +37,7 @@ class Logger:
             print(message, flush=True)
         else:
             self.progress_bar.write(message)
+
         self.log_file.write(message + '\n')
         self.log_file.flush()
 

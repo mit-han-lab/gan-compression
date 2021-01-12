@@ -36,31 +36,31 @@ class CocoDataset(SPADEDataset):
         phase = opt.phase
 
         label_dir = os.path.join(root, '%s_label' % phase)
-        label_paths = make_dataset(label_dir, recursive=False, read_cache=True)
+        label_paths = make_dataset(label_dir, recursive=False)
 
         if not opt.coco_no_portraits and opt.isTrain:
             label_portrait_dir = os.path.join(root, '%s_label_portrait' % phase)
             if os.path.isdir(label_portrait_dir):
-                label_portrait_paths = make_dataset(label_portrait_dir, recursive=False, read_cache=True)
+                label_portrait_paths = make_dataset(label_portrait_dir, recursive=False)
                 label_paths += label_portrait_paths
 
         image_dir = os.path.join(root, '%s_img' % phase)
-        image_paths = make_dataset(image_dir, recursive=False, read_cache=True)
+        image_paths = make_dataset(image_dir, recursive=False)
 
         if not opt.coco_no_portraits and opt.isTrain:
             image_portrait_dir = os.path.join(root, '%s_img_portrait' % phase)
             if os.path.isdir(image_portrait_dir):
-                image_portrait_paths = make_dataset(image_portrait_dir, recursive=False, read_cache=True)
+                image_portrait_paths = make_dataset(image_portrait_dir, recursive=False)
                 image_paths += image_portrait_paths
 
         if not opt.no_instance:
             instance_dir = os.path.join(root, '%s_inst' % phase)
-            instance_paths = make_dataset(instance_dir, recursive=False, read_cache=True)
+            instance_paths = make_dataset(instance_dir, recursive=False)
 
             if not opt.coco_no_portraits and opt.isTrain:
                 instance_portrait_dir = os.path.join(root, '%s_inst_portrait' % phase)
                 if os.path.isdir(instance_portrait_dir):
-                    instance_portrait_paths = make_dataset(instance_portrait_dir, recursive=False, read_cache=True)
+                    instance_portrait_paths = make_dataset(instance_portrait_dir, recursive=False)
                     instance_paths += instance_portrait_paths
 
         else:

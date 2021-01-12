@@ -23,9 +23,11 @@ To help users better understand and use our codebase, we briefly overview the fu
 [configs](../configs) directory contains modules related to the search space configuration used in "once-for-all" network training.
 
 * [\_\_init\_\_.py](../configs/__init__.py) contains an encoding and a decoding function of the configuration description string.
-* [resnet_configs.py](../configs/resnet_configs.py) is a module that implements a configuration set class that used in training ResNet-based "once-for-all" network. 
-* [single_configs.py](../configs/single_configs.py) is a module that implements a configuration set class that only contains a single configuration. Usually, it is used in fine-tuning.
-* [spade_configs.py](../configs/spade_configs.py) is a module that implements a configuration set class that used in training SPADE-based "once-for-all" network. 
+* [channel_configs.py](../configs/channel_configs.py) a module that implements a configuration search space class that used in training "once-for-all" network.
+* [munit_configs.py](../configs/munit_configs.py) is a module that defines some search space of the MUNIT "once-for-all" network. 
+* [resnet_configs.py](../configs/resnet_configs.py) is a module that defines some search space of the ResNet-based "once-for-all" network. 
+* [single_configs.py](../configs/single_configs.py) is a module that implements a configuration set class that only contains a single configuration. Usually, it is used in fine-tuning and testing.
+* [spade_configs.py](../configs/spade_configs.py) is a module that defines some search space of the SPADE-based "once-for-all" network. 
 
 ### [data](../data)
 
@@ -48,8 +50,10 @@ To help users better understand and use our codebase, we briefly overview the fu
 [distillers](../distillers) directory contains modules related to distillation for different model architectures.
 
 * [\_\_init\_\_.py](../distillers/__init__.py)  implements the interface between this package and distill scripts.  `distill.py` calls `from distillers import create_distiller` and `distiller = create_distiller(opt)` to create a distiller given the option `opt`. You also need to call `distiller.setup(opt)` to properly initialize the model.
+* [base_munit_distiller.py](../models/base_munit_distiller.py) implements an abstract base class for the distiller for MUNIT architectures. It also includes commonly used helper functions for intermediate distillation, which can be later used in subclasses.
 * [base_resnet_distiller.py](../models/base_resnet_distiller.py) implements an abstract base class for the distiller for ResNet architectures. It also includes commonly used helper functions for intermediate distillation, which can be later used in subclasses.
 * [base_spade_distiller.py](../models/base_spade_distiller.py) implements an abstract base class for the distiller for SPADE architectures. It also includes commonly used helper functions for intermediate distillation, which can be later used in subclasses.
+* [munit_distiller.py](../models/munit_distiller.py) is a subclass of [base_munit_distiller.py](../models/base_munit_distiller.py) implements an class for the distiller of MUNIT architectures.
 * [resnet_distiller.py](../models/resnet_distiller.py) is a subclass of [base_resnet_distiller.py](../models/base_resnet_distiller.py) implements an class for the distiller of ResNet architectures.
 * [spade_distiller.py](../models/spade_distiller.py) is a subclass of [base_spade_distiller.py](../models/base_spade_distiller.py) implements an class for the distiller of SPADE architectures.
 
@@ -71,6 +75,9 @@ To help users better understand and use our codebase, we briefly overview the fu
 * [modules](../models/modules) directory contains many pytorch nn.Module networks and loss moduels.
   * [munit_architecture](../models/modules/munit_architecture) directory contains some MUNIT generator Pytorch modules:
     * [munit_generator.py](../models/modules/resnet_architecture/munit_generator.py) implements the original MUNIT Adain generator in the original [MUNIT repository](https://github.com/NVlabs/MUNIT).
+    * [sub_mobile_munit_generator.py](../models/modules/munit_architecture/sub_mobile_munit_generator.py) implements our final compressed MUNIT generator.
+    * [super_mobile_munit_generator.py](../models/modules/munit_architecture/super_mobile_munit_generator.py) implements our mobile-style "once-for-all" MUNIT generator.
+    * [super_munit_generator.py](../models/modules/munit_architecture/super_munit_generator.py) implements the "once-for-all" MUNIT generator in original architecture.
   * [resnet_architecture](../models/modules/resnet_architecture) directory contains some ResNet-based generator Pytorch modules:
     * [legacy_sub_mobile_resnet_generator.py](../models/modules/resnet_architecture/legacy_sub_mobile_resnet_generator.py) implements a deprecated old version of [sub_mobile_resnet_generator.py](../models/modules/resnet_architecture/sub_mobile_resnet_generator.py), which is only used to test some of our old paper models.
     * [mobile_resnet_generator.py](../models/modules/resnet_architecture/mobile_resnet_generator.py) implements a MobileNet-style [resnet_generator.py](../models/modules/resnet_architecture/resnet_generator.py).
@@ -110,6 +117,7 @@ To help users better understand and use our codebase, we briefly overview the fu
 * [\_\_init\_\_.py](../supernets/__init__.py)  implements the interface between this package and "once-for-all" network training scripts.  `train_supernet.py` calls `from supernets import create_supernet` and `supernet = create_supernet(opt)` to create a "once-for-all" network given the option `opt`. You also need to call `supernet.setup(opt)` to properly initialize the "once-for-all" network.
 * [resnet_supernet.py](../models/resnet_supernet.py) is a subclass of [base_resnet_distiller.py](../models/base_resnet_distiller.py) implements an class for the "once-for-all" training for ResNet-based architectures.
 * [spade_supernet.py](../models/spade_supernet.py) is a subclass of [base_spade_distiller.py](../models/base_spade_distiller.py) implements an class for the "once-for-all" training for SPADE-based architectures.
+* [munit_supernet.py](../models/munit_supernet.py) is a subclass of [base_munit_distiller.py](../models/base_munit_distiller.py) implements an class for the "once-for-all" training for SPADE-based architectures.
 
 ### [options](../options)
 
@@ -117,7 +125,8 @@ To help users better understand and use our codebase, we briefly overview the fu
 
 * [base_options.py](../options/base_options.py) includes options that are used in both training and test. It also implements a few helper functions such as parsing, printing, and saving the options. It also gathers additional options defined in `modify_commandline_options` functions in both dataset class and model class.
 * [distill_options.py](../options/distill_options.py) includes options that are only used during distillation.
-* [search_options.py](../options/searchl_options.py) includes options that are only used during searching.
+* [evolution_options.py](../options/evolution_options.py) includes options that are only used during evolution search.
+* [search_options.py](../options/search_options.py) includes options that are only used during search.
 * [supernet_options.py](../options/supernet_options.py) includes options that are only used during "once-for-all" network training and fine-tuning.
 * [test_options.py](../options/test_options.py) includes options that are only used during test time.
 * [train_options.py](../options/train_options.py) includes options that are only used during the original model training time.

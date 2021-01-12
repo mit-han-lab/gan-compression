@@ -9,4 +9,4 @@ python train.py --dataroot database/cityscapes \
   --real_stat_path real_stat/cityscapes_A.npz \
   --drn_path drn-d-105_ms_cityscapes.pth \
   --cityscapes_path database/cityscapes-origin \
-  --table_path datasets/table.txt
+  --table_path datasets/val_table.txt

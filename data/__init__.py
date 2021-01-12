@@ -5,6 +5,7 @@ import os
 import torch.utils.data
 
 from data.base_dataset import BaseDataset
+import random
 
 
 def find_dataset_using_name(dataset_name):
@@ -51,6 +52,7 @@ def create_eval_dataloader(opt, direction=None):
     opt = copy.deepcopy(opt)
     # Set some evaluation options
     # opt.prepocess = 'resize_and_crop'
+    opt.isTrain = False
     opt.load_size = opt.crop_size
     opt.no_flip = True
     opt.serial_batches = True
@@ -72,7 +74,8 @@ def create_train_dataloader(opt):
     opt.no_flip = False
     opt.serial_batches = False
     opt.phase = 'train'
-    opt.load_in_memory = False
+    opt.meta_path = opt.calibration_meta_path
+    opt.load_in_memory = opt.calibration_load_in_memory
     opt.max_dataset_size = 512
     dataloader = CustomDatasetDataLoader(opt)
     dataloader = dataloader.load_data()
@@ -112,3 +115,9 @@ class CustomDatasetDataLoader():
         # print(len(self.dataloader))
         for i, data in enumerate(self.dataloader):
             yield data
+
+    def sample(self):
+        idx = random.randint(0, len(self.dataset) - 1)
+        img = self.dataset.__getitem__(idx)['A']
+        img = img.unsqueeze(0)
+        return img

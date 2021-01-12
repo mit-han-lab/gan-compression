@@ -30,7 +30,7 @@ if __name__ == '__main__':
                                  'finetune', 'compressed', 'legacy'],
                         help='specify the stage you want to download')
     parser.add_argument('--model', type=str, default='pix2pix',
-                        choices=['pix2pix', 'cycle_gan', 'gaugan'],
+                        choices=['pix2pix', 'cycle_gan', 'gaugan', 'munit'],
                         help='specify the model you want to download')
     parser.add_argument('--task', type=str, default='horse2zebra',
                         choices=['horse2zebra', 'edges2shoes-r', 'map2sat', 'cityscapes'],

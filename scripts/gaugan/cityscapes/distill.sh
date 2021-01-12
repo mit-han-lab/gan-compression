@@ -8,6 +8,6 @@ python distill.py --dataroot database/cityscapes-origin \
   --real_stat_path real_stat/cityscapes_A.npz \
   --drn_path drn-d-105_ms_cityscapes.pth \
   --cityscapes_path database/cityscapes-origin \
-  --table_path datasets/table.txt \
+  --table_path datasets/val_table.txt \
   --gpu_ids 0,1,2,3,4,5,6,7 \
   --load_in_memory --no_fid

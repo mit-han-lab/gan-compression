@@ -9,4 +9,4 @@ python train_supernet.py --dataroot database/maps \
   --restore_teacher_G_path pretrained/pix2pix/map2sat/full/latest_net_G.pth \
   --real_stat_path real_stat/maps_A.npz \
   --direction BtoA --config_set channels-64-pix2pix \
-  --lambda_recon 10 --lambda_distill 0.01
+  --lambda_recon 10 --lambda_distill 0.01 --meta_path datasets/metas/maps/train1.meta

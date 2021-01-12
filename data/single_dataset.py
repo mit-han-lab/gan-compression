@@ -10,14 +10,23 @@ class SingleDataset(BaseDataset):
     It can be used for generating CycleGAN results only for one side with the model option '-model test'.
     """
 
+    @staticmethod
+    def modify_commandline_options(parser, is_train):
+        parser = BaseDataset.modify_commandline_options(parser, is_train)
+        parser.add_argument('--meta_path', type=str, default=None,
+                            help='the path to the meta file')
+        return parser
+
     def __init__(self, opt):
         """Initialize this dataset class.
 
         Parameters:
             opt (Option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
         """
+
         BaseDataset.__init__(self, opt)
-        self.A_paths = sorted(make_dataset(opt.dataroot, opt.max_dataset_size))
+        meta_path = opt.meta_path if opt.phase == 'train' else None
+        self.A_paths = sorted(make_dataset(opt.dataroot, opt.max_dataset_size, meta_path=meta_path))
         input_nc = self.opt.output_nc if self.opt.direction == 'BtoA' else self.opt.input_nc
         self.transform = get_transform(opt, grayscale=(input_nc == 1))
 

@@ -1,6 +1,8 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [videos](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex) | [slides](https://hanlab.mit.edu/projects/gancompression/resources/546-slides.pdf) 
 
+**[NEW!]** Add support to the [MUNIT](https://github.com/NVlabs/MUNIT), a multimodal unsupervised image-to-image translation approach! Please follow the [test commands](#munit) to test the pre-trained models and the [tutorial](docs/tutorials/fast_gan_compression.md) to train your own models!
+
 **[NEW!]** The [arXiv v3](https://arxiv.org/abs/2003.08936) is released! We introduce an improved pipeline, [Fast GAN Compression](docs/tutorials/fast_gan_compression.md), which could produce comparable results as GAN Compression with much simpler procedures!
 
 ![teaser](imgs/teaser.png)
@@ -118,6 +120,7 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
 
   ```shell
   bash datasets/download_real_stat.sh edges2shoes-r B
+  bash datasets/download_real_stat.sh edges2shoes-r subtrain_B
   ```
 
 #### Apply a Pre-trained Model
@@ -202,6 +205,54 @@ PyTorch Colab notebook: [CycleGAN](https://colab.research.google.com/github/mit-
   bash scripts/gaugan/cityscapes/test_legacy.sh
   bash scripts/gaugan/cityscapes/latency_legacy.sh
   ```
+
+### <span id="munit">MUNIT</span>
+
+#### Setup
+
+* Prepare the dataset (e.g., edges2shoes-r).
+
+  ```shell
+  bash datasets/download_pix2pix_dataset.sh edges2shoes-r
+  python datasets/separate_A_and_B.py --input_dir database/edges2shoes-r --output_dir database/edges2shoes-r-unaligned
+  python datasets/separate_A_and_B.py --input_dir database/edges2shoes-r --output_dir database/edges2shoes-r-unaligned --phase val
+  ```
+
+* Get the statistical information for the ground-truth images for your dataset to compute FID. We provide pre-prepared real statistics for several datasets. For example,
+
+  ```shell
+  bash datasets/download_real_stat.sh edges2shoes-r B
+  bash datasets/download_real_stat.sh edges2shoes-r-unaligned subtrain_B
+  ```
+
+#### Apply a Pretrained Model
+
+* Download the pre-trained models.
+
+  ```shell
+  python scripts/download_model.py --model gaugan --task cityscapes --stage full
+  python scripts/download_model.py --model gaugan --task cityscapes --stage compressed
+  ```
+
+* Test the original full model.
+
+  ```shell
+  bash scripts/munit/edges2shoes-r_fast/test_full.sh
+  ```
+
+* Test the compressed model.
+
+  ```shell
+  bash scripts/munit/edges2shoes-r_fast/test_compressed.sh
+  ```
+
+* Measure the latency of the two models.
+
+  ```shell
+  bash scripts/munit/edges2shoes-r_fast/latency_full.sh
+  bash scripts/munit/edges2shoes-r_fast/latency_compressed.sh
+  ```
+
 
 ### <span id="cityscapes">Cityscapes Dataset</span>
 
@@ -411,9 +462,24 @@ Here we show the performance of all our released models:
     <td>25.06</td>
     <td>35.05</td>
   </tr>
+  <tr>
+    <td rowspan="2">MUNIT</td>
+    <td rowspan="2">edges→shoes</td>
+    <td>Original</td>
+    <td>15.0M</td>
+    <td>77.3G</td>
+    <td>30.13</td>
+    <td>--</td>
+  </tr>
+  <tr>
+    <td>Fast GAN Compression</td>
+    <td>1.10M</td>
+    <td>2.63G</td>
+    <td>30.53</td>
+    <td>--</td>
+  </tr>
 </tbody>
 </table>
-
 
 ### Training
 

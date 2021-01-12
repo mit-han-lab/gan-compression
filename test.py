@@ -122,6 +122,7 @@ if __name__ == '__main__':
 
     if drn_model is not None:
         mIoU = get_cityscapes_mIoU(fakes, names, drn_model, device,
+                                   table_path=opt.table_path,
                                    data_dir=opt.cityscapes_path,
                                    batch_size=opt.batch_size,
                                    num_workers=opt.num_threads)

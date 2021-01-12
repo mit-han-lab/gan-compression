@@ -3,10 +3,12 @@ Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
 Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
 """
 
+import os
+
 from PIL import Image
 
+from data.base_dataset import BaseDataset, get_params, get_transform
 from utils import util
-from .base_dataset import BaseDataset, get_params, get_transform
 
 
 class SPADEDataset(BaseDataset):
@@ -23,6 +25,8 @@ class SPADEDataset(BaseDataset):
                             help='if specified, do *not* add instance map as input')
         parser.add_argument('--contain_dontcare_label', action='store_true',
                             help='if the label map contains dontcare label (dontcare=255)')
+        parser.add_argument('--meta_path', type=str, default=None,
+                            help='the path to the meta file')
         return parser
 
     def paths_match(self, path1, path2):
@@ -90,7 +94,17 @@ class SPADEDataset(BaseDataset):
     def initialize(self, opt):
         self.opt = opt
 
-        label_paths, image_paths, instance_paths = self.get_paths(opt)
+        if opt.phase == 'train' and opt.meta_path is not None:
+            label_paths, image_paths, instance_paths = [], [], []
+            with open(opt.meta_path, 'r') as f:
+                lines = f.readlines()
+            for line in lines:
+                splits = line.strip().split(' ')
+                label_paths.append(os.path.join(opt.dataroot, splits[0]))
+                image_paths.append(os.path.join(opt.dataroot, splits[1]))
+                instance_paths.append(os.path.join(opt.dataroot, splits[2]))
+        else:
+            label_paths, image_paths, instance_paths = self.get_paths(opt)
 
         util.natural_sort(label_paths)
         util.natural_sort(image_paths)
