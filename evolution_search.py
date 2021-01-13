@@ -250,7 +250,7 @@ class EvolutionSearcher:
                 child_pool.append(new_sample)
                 macs_pool.append(macs)
             results = self.evaluate(child_pool)
-            for i in range(mutation_numbers):
+            for i in range(population_size):
                 population.append((results[i], child_pool[i], macs_pool[i]))
             if time.time() - last_save_time > opt.save_freq * 60:
                 last_save_time = time.time()
