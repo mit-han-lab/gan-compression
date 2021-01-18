@@ -9,4 +9,4 @@ python train_supernet.py --dataroot database/edges2shoes-r \
   --real_stat_path real_stat/edges2shoes-r_B.npz \
   --nepochs 10 --nepochs_decay 30 \
   --teacher_ngf 64 --student_ngf 48 \
-  --config_set channels-48
+  --config_set channels-48 --meta_path datasets/metas/edges2shoes-r/train1.meta

@@ -12,4 +12,6 @@ python distill.py --dataroot database/horse2zebra \
   --lambda_recon 10 \
   --lambda_distill 0.01 \
   --nepochs 100 --nepochs_decay 100 \
-  --save_epoch_freq 20
+  --save_epoch_freq 20 \
+  --metaA_path datasets/metas/horse2zebra/train1A.meta \
+  --metaB_path datasets/metas/horse2zebra/train1B.meta

@@ -11,4 +11,4 @@ python train_supernet.py --dataroot database/maps \
   --restore_D_path logs/pix2pix/map2sat/distill/checkpoints/latest_net_D.pth \
   --real_stat_path real_stat/maps_A.npz \
   --direction BtoA --config_set channels-48 \
-  --lambda_recon 10 --lambda_distill 0.01
+  --lambda_recon 10 --lambda_distill 0.01 --meta_path datasets/metas/maps/train1.meta

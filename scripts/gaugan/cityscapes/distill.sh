@@ -10,4 +10,4 @@ python distill.py --dataroot database/cityscapes-origin \
   --cityscapes_path database/cityscapes-origin \
   --table_path datasets/val_table.txt \
   --gpu_ids 0,1,2,3,4,5,6,7 \
-  --load_in_memory --no_fid
+  --load_in_memory --no_fid --meta_path datasets/metas/cityscapes-origin/train1.meta

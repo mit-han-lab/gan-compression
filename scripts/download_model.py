@@ -12,6 +12,8 @@ def check(opt):
         assert opt.task in ['horse2zebra', 'horse2zebra_fast']
     elif opt.model == 'gaugan':
         assert opt.task in ['cityscapes', 'cityscapes_lite', 'coco_fast']
+    elif opt.model == 'munit':
+        assert opt.task in ['edges2shoes-r_fast']
     else:
         raise NotImplementedError('Unsupported model [%s]!' % opt.model)
 

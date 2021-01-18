@@ -13,7 +13,7 @@ Please refer to our [README](../../README.md) for the installation, dataset prep
 
 ### Pipeline
 
-Below we show the full pipeline for compressing pix2pix, cycleGAN and GauGAN models. **We provide pre-trained models after each step. You could use the pretrained models to skip some steps.** 
+Below we show the full pipeline for compressing pix2pix, cycleGAN and GauGAN models. **We provide pre-trained models after some steps. You could use the pretrained models to skip some steps.** 
 
 In fact, several steps including "Train a MobileNet Teacher Model", "Pre-distillation", and "Fine-tuning the Best Model" may be omitted from the whole pipeline. Please check [fast_gan_compression.md](fast_gan_compression.md) for our improved pipeline Fast GAN Compression. For more details about the differences between GAN Compression and Fast GAN Compression, please refer to [Section 4.1 Pipelines](https://arxiv.org/abs/2003.08936) of our paper.
 

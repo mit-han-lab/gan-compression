@@ -12,4 +12,6 @@ python train_supernet.py --dataroot database/horse2zebra \
   --lambda_recon 10 --lambda_distill 0.01 \
   --nepochs 200 --nepochs_decay 200 \
   --save_epoch_freq 20 \
-  --config_set channels-32
+  --config_set channels-32 \
+  --metaA_path datasets/metas/horse2zebra/train1A.meta \
+  --metaB_path datasets/metas/horse2zebra/train1B.meta

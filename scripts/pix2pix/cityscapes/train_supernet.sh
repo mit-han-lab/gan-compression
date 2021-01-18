@@ -14,4 +14,4 @@ python train_supernet.py --dataroot database/cityscapes \
   --cityscapes_path database/cityscapes-origin \
   --table_path datasets/val_table.txt \
   --eval_batch_size 2 \
-  --direction BtoA
+  --direction BtoA --meta_path datasets/metas/cityscapes/train1.meta
