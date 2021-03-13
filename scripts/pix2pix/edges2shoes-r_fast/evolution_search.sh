@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-python evolution_search.py --phase --dataroot database/edges2shoes-r \
+python evolution_search.py --phase train --dataroot database/edges2shoes-r \
   --restore_G_path logs/pix2pix/edges2shoes-r_fast/supernet/checkpoints/latest_net_G.pth \
   --output_dir logs/pix2pix/edges2shoes-r_fast/supernet/evolution \
   --ngf 64 --batch_size 32 \
