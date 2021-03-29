@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-python evolution_search.py --dataroot database/horse2zebra/valA \
+python evolution_search.py --dataroot database/horse2zebra/trainA \
   --dataset_mode single --phase train \
   --restore_G_path logs/cycle_gan/horse2zebra_fast/supernet/checkpoints/latest_net_G.pth \
   --output_dir logs/cycle_gan/horse2zebra_fast/supernet/evolution \
