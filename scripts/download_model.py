@@ -35,7 +35,6 @@ if __name__ == '__main__':
                         choices=['pix2pix', 'cycle_gan', 'gaugan', 'munit'],
                         help='specify the model you want to download')
     parser.add_argument('--task', type=str, default='horse2zebra',
-                        choices=['horse2zebra', 'edges2shoes-r', 'map2sat', 'cityscapes'],
                         help='the base number of filters of the generator')
     opt = parser.parse_args()
     check(opt)
