@@ -264,7 +264,8 @@ python datasets/prepare_cityscapes_dataset.py \
 --gtFine_dir database/cityscapes-origin/gtFine \
 --leftImg8bit_dir database/cityscapes-origin/leftImg8bit \
 --output_dir database/cityscapes \
---table_path datasets/table.txt
+--train_table_path datasets/train_table.txt \
+--val_table_path datasets/val_table.txt
 ```
 
 You will get a preprocessed dataset in `database/cityscapes` and a mapping table (used to compute mIoU) in `dataset/table.txt`.
