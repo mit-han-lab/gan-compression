@@ -518,6 +518,6 @@ If you use this code for your research, please cite our [paper](https://arxiv.or
 
 ## Acknowledgements
 
-Our code is developed based on [pytorch-CycleGAN-and-pix2pix](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix) and [SPADE](https://github.com/NVlabs/SPADE).
+Our code is developed based on [pytorch-CycleGAN-and-pix2pix](https://github.com/junyanz/pytorch-CycleGAN-and-pix2pix), [SPADE](https://github.com/NVlabs/SPADE) and [MUNIT](https://github.com/NVlabs/MUNIT).
 
 We also thank [pytorch-fid](https://github.com/mseitzer/pytorch-fid) for FID computation, [drn](https://github.com/fyu/drn) for cityscapes mIoU computation and [deeplabv2](https://github.com/kazuto1011/deeplab-pytorch) for Coco-Stuff mIoU computation.
