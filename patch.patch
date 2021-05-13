@@ -1,0 +1,3210 @@
+Index: models/spade_model.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/models/spade_model.py b/models/spade_model.py
+--- a/models/spade_model.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/models/spade_model.py	(date 1603432384000)
+@@ -1,124 +1,117 @@
+-"""
+-Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
+-Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+-"""
++import argparse
++import copy
++import ntpath
++import os
++from collections import OrderedDict
+ 
++import numpy as np
+ import torch
+-import models.networks as networks
+-import util.util as util
++from tqdm import tqdm
+ 
++from data import create_eval_dataloader
++from data import create_train_dataloader
++from metric import get_fid, get_cityscapes_mIoU
++from metric.cityscapes_mIoU import DRNSeg
++from metric.fid_score import InceptionV3
++from models import networks
++from models.base_model import BaseModel
++from models.modules.spade_modules.spade_model_modules import SPADEModelModules
++from models.modules.sync_batchnorm import DataParallelWithCallback
++from utils import util
+ 
+-class Pix2PixModel(torch.nn.Module):
++
++class SPADEModel(BaseModel):
+     @staticmethod
+     def modify_commandline_options(parser, is_train):
+-        networks.modify_commandline_options(parser, is_train)
++        assert isinstance(parser, argparse.ArgumentParser)
++        parser.set_defaults(netG='sub_mobile_spade')
++        parser.add_argument('--separable_conv_norm', type=str, default='instance',
++                            choices=('none', 'instance', 'batch'),
++                            help='whether to use instance norm for the separable convolutions')
++        parser.add_argument('--norm_G', type=str, default='spadesyncbatch3x3',
++                            help='instance normalization or batch normalization')
++        parser.add_argument('--num_upsampling_layers',
++                            choices=('normal', 'more', 'most'), default='more',
++                            help="If 'more', adds upsampling layer between the two middle resnet blocks. "
++                                 "If 'most', also add one more upsampling + resnet layer at the end of the generator")
++        if is_train:
++            parser.add_argument('--restore_G_path', type=str, default=None,
++                                help='the path to restore the generator')
++            parser.add_argument('--restore_D_path', type=str, default=None,
++                                help='the path to restore the discriminator')
++            parser.add_argument('--real_stat_path', type=str, required=True,
++                                help='the path to load the groud-truth images information to compute FID.')
++            parser.add_argument('--lambda_gan', type=float, default=1, help='weight for gan loss')
++            parser.add_argument('--lambda_feat', type=float, default=10, help='weight for gan feature loss')
++            parser.add_argument('--lambda_vgg', type=float, default=10, help='weight for vgg loss')
++            parser.add_argument('--beta2', type=float, default=0.999, help='momentum term of adam')
++            parser.add_argument('--no_TTUR', action='store_true', help='Use TTUR training scheme')
++            parser.set_defaults(netD='multi_scale', ndf=64, dataset_mode='cityscapes', batch_size=16,
++                                print_freq=50, save_latest_freq=10000000000, save_epoch_freq=10,
++                                nepochs=100, nepochs_decay=100, init_type='xavier')
++        else:
++            parser.add_argument('--restore_G_path', type=str, required=True, help='the path to restore the generator')
++        parser = networks.modify_commandline_options(parser, is_train)
+         return parser
+ 
+     def __init__(self, opt):
+-        super().__init__()
+-        self.opt = opt
+-        self.FloatTensor = torch.cuda.FloatTensor if self.use_gpu() \
+-            else torch.FloatTensor
+-        self.ByteTensor = torch.cuda.ByteTensor if self.use_gpu() \
+-            else torch.ByteTensor
+-
+-        self.netG, self.netD, self.netE = self.initialize_networks(opt)
+-
+-        # set loss functions
+-        if opt.isTrain:
+-            self.criterionGAN = networks.GANLoss(
+-                opt.gan_mode, tensor=self.FloatTensor, opt=self.opt)
+-            self.criterionFeat = torch.nn.L1Loss()
+-            if not opt.no_vgg_loss:
+-                self.criterionVGG = networks.VGGLoss(self.opt.gpu_ids)
+-            if opt.use_vae:
+-                self.KLDLoss = networks.KLDLoss()
+-
+-    # Entry point for all calls involving forward pass
+-    # of deep networks. We used this approach since DataParallel module
+-    # can't parallelize custom functions, we branch to different
+-    # routines based on |mode|.
+-    def forward(self, data, mode):
+-        input_semantics, real_image = self.preprocess_input(data)
+-
+-        if mode == 'generator':
+-            g_loss, generated = self.compute_generator_loss(
+-                input_semantics, real_image)
+-            return g_loss, generated
+-        elif mode == 'discriminator':
+-            d_loss = self.compute_discriminator_loss(
+-                input_semantics, real_image)
+-            return d_loss
+-        elif mode == 'encode_only':
+-            z, mu, logvar = self.encode_z(real_image)
+-            return mu, logvar
+-        elif mode == 'inference':
+-            with torch.no_grad():
+-                fake_image, _ = self.generate_fake(input_semantics, real_image)
+-            return fake_image
++        super(SPADEModel, self).__init__(opt)
++        self.model_names = ['G']
++        self.visual_names = ['labels', 'fake_B', 'real_B']
++        self.modules = SPADEModelModules(opt).to(self.device)
++        if len(opt.gpu_ids) > 0:
++            self.modules = DataParallelWithCallback(self.modules, device_ids=opt.gpu_ids)
++            self.modules_on_one_gpu = self.modules.module
+         else:
+-            raise ValueError("|mode| is invalid")
+-
+-    def create_optimizers(self, opt):
+-        G_params = list(self.netG.parameters())
+-        if opt.use_vae:
+-            G_params += list(self.netE.parameters())
++            self.modules_on_one_gpu = self.modules
+         if opt.isTrain:
+-            D_params = list(self.netD.parameters())
+-
+-        beta1, beta2 = opt.beta1, opt.beta2
+-        if opt.no_TTUR:
+-            G_lr, D_lr = opt.lr, opt.lr
++            self.model_names.append('D')
++            self.loss_names = ['G_gan', 'G_feat', 'G_vgg', 'D_real', 'D_fake']
++            self.optimizer_G, self.optimizer_D = self.modules_on_one_gpu.create_optimizers()
++            self.optimizers = [self.optimizer_G, self.optimizer_D]
++            if not opt.no_fid:
++                block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
++                self.inception_model = InceptionV3([block_idx])
++                self.inception_model.to(self.device)
++                self.inception_model.eval()
++            if 'cityscapes' in opt.dataroot and not opt.no_mIoU:
++                self.drn_model = DRNSeg('drn_d_105', 19, pretrained=False)
++                util.load_network(self.drn_model, opt.drn_path, verbose=False)
++                self.drn_model.to(self.device)
++                self.drn_model.eval()
++            self.eval_dataloader = create_eval_dataloader(self.opt)
++            self.best_fid = 1e9
++            self.best_mIoU = -1e9
++            self.fids, self.mIoUs = [], []
++            self.is_best = False
++            self.npz = np.load(opt.real_stat_path)
+         else:
+-            G_lr, D_lr = opt.lr / 2, opt.lr * 2
+-
+-        optimizer_G = torch.optim.Adam(G_params, lr=G_lr, betas=(beta1, beta2))
+-        optimizer_D = torch.optim.Adam(D_params, lr=D_lr, betas=(beta1, beta2))
+-
+-        return optimizer_G, optimizer_D
+-
+-    def save(self, epoch):
+-        util.save_network(self.netG, 'G', epoch, self.opt)
+-        util.save_network(self.netD, 'D', epoch, self.opt)
+-        if self.opt.use_vae:
+-            util.save_network(self.netE, 'E', epoch, self.opt)
+-
+-    ############################################################################
+-    # Private helper methods
+-    ############################################################################
++            self.modules.eval()
++        self.train_dataloader = create_train_dataloader(opt)
+ 
+-    def initialize_networks(self, opt):
+-        netG = networks.define_G(opt)
+-        netD = networks.define_D(opt) if opt.isTrain else None
+-        netE = networks.define_E(opt) if opt.use_vae else None
++    def set_input(self, input):
++        self.data = input
++        self.image_paths = input['path']
++        self.labels = input['label'].to(self.device)
++        self.input_semantics, self.real_B = self.preprocess_input(input)
+ 
+-        if not opt.isTrain or opt.continue_train:
+-            netG = util.load_network(netG, 'G', opt.which_epoch, opt)
+-            if opt.isTrain:
+-                netD = util.load_network(netD, 'D', opt.which_epoch, opt)
+-            if opt.use_vae:
+-                netE = util.load_network(netE, 'E', opt.which_epoch, opt)
+-
+-        return netG, netD, netE
+-
+-    # preprocess the input, such as moving the tensors to GPUs and
+-    # transforming the label map to one-hot encoding
+-    # |data|: dictionary of the input data
++    def test(self, config=None):
++        with torch.no_grad():
++            self.forward(on_one_gpu=True, config=config)
+ 
+     def preprocess_input(self, data):
+         # move to GPU and change data types
+         data['label'] = data['label'].long()
+-        if self.use_gpu():
+-            data['label'] = data['label'].cuda()
+-            data['instance'] = data['instance'].cuda()
+-            data['image'] = data['image'].cuda()
++        data['label'] = data['label'].to(self.device)
++        data['instance'] = data['instance'].to(self.device)
++        data['image'] = data['image'].to(self.device)
+ 
+         # create one-hot label map
+         label_map = data['label']
+         bs, _, h, w = label_map.size()
+-        nc = self.opt.label_nc + 1 if self.opt.contain_dontcare_label \
+-            else self.opt.label_nc
+-        input_label = self.FloatTensor(bs, nc, h, w).zero_()
++        nc = self.opt.input_nc + 1 if self.opt.contain_dontcare_label \
++            else self.opt.input_nc
++        input_label = torch.zeros([bs, nc, h, w], device=self.device)
+         input_semantics = input_label.scatter_(1, label_map, 1.0)
+ 
+         # concatenate instance map if it exists
+@@ -129,123 +122,159 @@
+ 
+         return input_semantics, data['image']
+ 
+-    def compute_generator_loss(self, input_semantics, real_image):
+-        G_losses = {}
+-
+-        fake_image, KLD_loss = self.generate_fake(
+-            input_semantics, real_image, compute_kld_loss=self.opt.use_vae)
+-
+-        if self.opt.use_vae:
+-            G_losses['KLD'] = KLD_loss
+-
+-        pred_fake, pred_real = self.discriminate(
+-            input_semantics, fake_image, real_image)
+-
+-        G_losses['GAN'] = self.criterionGAN(pred_fake, True,
+-                                            for_discriminator=False)
+-
+-        if not self.opt.no_ganFeat_loss:
+-            num_D = len(pred_fake)
+-            GAN_Feat_loss = self.FloatTensor(1).fill_(0)
+-            for i in range(num_D):  # for each discriminator
+-                # last output is the final prediction, so we exclude it
+-                num_intermediate_outputs = len(pred_fake[i]) - 1
+-                for j in range(num_intermediate_outputs):  # for each layer output
+-                    unweighted_loss = self.criterionFeat(
+-                        pred_fake[i][j], pred_real[i][j].detach())
+-                    GAN_Feat_loss += unweighted_loss * self.opt.lambda_feat / num_D
+-            G_losses['GAN_Feat'] = GAN_Feat_loss
+-
+-        if not self.opt.no_vgg_loss:
+-            G_losses['VGG'] = self.criterionVGG(fake_image, real_image) \
+-                * self.opt.lambda_vgg
+-
+-        return G_losses, fake_image
+-
+-    def compute_discriminator_loss(self, input_semantics, real_image):
+-        D_losses = {}
+-        with torch.no_grad():
+-            fake_image, _ = self.generate_fake(input_semantics, real_image)
+-            fake_image = fake_image.detach()
+-            fake_image.requires_grad_()
+-
+-        pred_fake, pred_real = self.discriminate(
+-            input_semantics, fake_image, real_image)
+-
+-        D_losses['D_Fake'] = self.criterionGAN(pred_fake, False,
+-                                               for_discriminator=True)
+-        D_losses['D_real'] = self.criterionGAN(pred_real, True,
+-                                               for_discriminator=True)
+-
+-        return D_losses
+-
+-    def encode_z(self, real_image):
+-        mu, logvar = self.netE(real_image)
+-        z = self.reparameterize(mu, logvar)
+-        return z, mu, logvar
+-
+-    def generate_fake(self, input_semantics, real_image, compute_kld_loss=False):
+-        z = None
+-        KLD_loss = None
+-        if self.opt.use_vae:
+-            z, mu, logvar = self.encode_z(real_image)
+-            if compute_kld_loss:
+-                KLD_loss = self.KLDLoss(mu, logvar) * self.opt.lambda_kld
+-
+-        fake_image = self.netG(input_semantics, z=z)
+-
+-        assert (not compute_kld_loss) or self.opt.use_vae, \
+-            "You cannot compute KLD loss if opt.use_vae == False"
+-
+-        return fake_image, KLD_loss
+-
+-    # Given fake and real image, return the prediction of discriminator
+-    # for each fake and real image.
+-
+-    def discriminate(self, input_semantics, fake_image, real_image):
+-        fake_concat = torch.cat([input_semantics, fake_image], dim=1)
+-        real_concat = torch.cat([input_semantics, real_image], dim=1)
+-
+-        # In Batch Normalization, the fake and real images are
+-        # recommended to be in the same batch to avoid disparate
+-        # statistics in fake and real images.
+-        # So both fake and real images are fed to D all at once.
+-        fake_and_real = torch.cat([fake_concat, real_concat], dim=0)
+-
+-        discriminator_out = self.netD(fake_and_real)
+-
+-        pred_fake, pred_real = self.divide_pred(discriminator_out)
+-
+-        return pred_fake, pred_real
+-
+-    # Take the prediction of fake and real images from the combined batch
+-    def divide_pred(self, pred):
+-        # the prediction contains the intermediate outputs of multiscale GAN,
+-        # so it's usually a list
+-        if type(pred) == list:
+-            fake = []
+-            real = []
+-            for p in pred:
+-                fake.append([tensor[:tensor.size(0) // 2] for tensor in p])
+-                real.append([tensor[tensor.size(0) // 2:] for tensor in p])
++    def forward(self, on_one_gpu=False, config=None):
++        if config is not None:
++            self.modules_on_one_gpu.config = config
++        if on_one_gpu:
++            self.fake_B = self.modules_on_one_gpu(self.input_semantics)
+         else:
+-            fake = pred[:pred.size(0) // 2]
+-            real = pred[pred.size(0) // 2:]
+-
+-        return fake, real
++            self.fake_B = self.modules(self.input_semantics)
+ 
+     def get_edges(self, t):
+-        edge = self.ByteTensor(t.size()).zero_()
+-        edge[:, :, :, 1:] = edge[:, :, :, 1:] | (t[:, :, :, 1:] != t[:, :, :, :-1])
+-        edge[:, :, :, :-1] = edge[:, :, :, :-1] | (t[:, :, :, 1:] != t[:, :, :, :-1])
+-        edge[:, :, 1:, :] = edge[:, :, 1:, :] | (t[:, :, 1:, :] != t[:, :, :-1, :])
+-        edge[:, :, :-1, :] = edge[:, :, :-1, :] | (t[:, :, 1:, :] != t[:, :, :-1, :])
++        edge = torch.zeros(t.size(), dtype=torch.uint8, device=self.device)
++        edge[:, :, :, 1:] = edge[:, :, :, 1:] | ((t[:, :, :, 1:] != t[:, :, :, :-1]).byte())
++        edge[:, :, :, :-1] = edge[:, :, :, :-1] | ((t[:, :, :, 1:] != t[:, :, :, :-1]).byte())
++        edge[:, :, 1:, :] = edge[:, :, 1:, :] | ((t[:, :, 1:, :] != t[:, :, :-1, :]).byte())
++        edge[:, :, :-1, :] = edge[:, :, :-1, :] | ((t[:, :, 1:, :] != t[:, :, :-1, :]).byte())
+         return edge.float()
+ 
+-    def reparameterize(self, mu, logvar):
+-        std = torch.exp(0.5 * logvar)
+-        eps = torch.randn_like(std)
+-        return eps.mul(std) + mu
++    def profile(self, config=None, verbose=True):
++        if config is not None:
++            self.modules_on_one_gpu.config = config
++        macs, params = self.modules_on_one_gpu.profile(self.input_semantics[:1])
++        if verbose:
++            print('MACs: %.3fG\tParams: %.3fM' % (macs / 1e9, params / 1e6), flush=True)
++        return macs, params
++
++    def backward_G(self):
++        losses = self.modules(self.input_semantics, self.real_B, mode='G_loss')
++        loss_G = losses['loss_G'].mean()
++        for loss_name in self.loss_names:
++            if loss_name.startswith('G'):
++                setattr(self, 'loss_%s' % loss_name, losses[loss_name].detach().mean())
++        loss_G.backward()
+ 
+-    def use_gpu(self):
+-        return len(self.opt.gpu_ids) > 0
++    def backward_D(self):
++        losses = self.modules(self.input_semantics, self.real_B, mode='D_loss')
++        loss_D = losses['loss_D'].mean()
++        for loss_name in self.loss_names:
++            if loss_name.startswith('D'):
++                setattr(self, 'loss_%s' % loss_name, losses[loss_name].detach().mean())
++        loss_D.backward()
++
++    def optimize_parameters(self, steps):
++        # self.forward()
++        self.set_requires_grad(self.modules_on_one_gpu.netD, False)
++        self.optimizer_G.zero_grad()
++        self.backward_G()
++        self.optimizer_G.step()
++        self.set_requires_grad(self.modules_on_one_gpu.netD, True)
++        self.optimizer_D.zero_grad()
++        self.backward_D()
++        self.optimizer_D.step()
++
++    def evaluate_model(self, step):
++        self.is_best = False
++        save_dir = os.path.join(self.opt.log_dir, 'eval', str(step))
++        os.makedirs(save_dir, exist_ok=True)
++        self.modules_on_one_gpu.netG.eval()
++        torch.cuda.empty_cache()
++        fakes, names = [], []
++        ret = {}
++        cnt = 0
++        for i, data_i in enumerate(tqdm(self.eval_dataloader, desc='Eval       ', position=2, leave=False)):
++            self.set_input(data_i)
++            self.test()
++            fakes.append(self.fake_B.cpu())
++            for j in range(len(self.image_paths)):
++                short_path = ntpath.basename(self.image_paths[j])
++                name = os.path.splitext(short_path)[0]
++                names.append(name)
++                if cnt < 10:
++                    input_im = util.tensor2label(self.input_semantics[j], self.opt.input_nc + 2)
++                    real_im = util.tensor2im(self.real_B[j])
++                    fake_im = util.tensor2im(self.fake_B[j])
++                    util.save_image(input_im, os.path.join(save_dir, 'input', '%s.png' % name), create_dir=True)
++                    util.save_image(real_im, os.path.join(save_dir, 'real', '%s.png' % name), create_dir=True)
++                    util.save_image(fake_im, os.path.join(save_dir, 'fake', '%s.png' % name), create_dir=True)
++                cnt += 1
++        if not self.opt.no_fid:
++            fid = get_fid(fakes, self.inception_model, self.npz, device=self.device,
++                          batch_size=self.opt.eval_batch_size, tqdm_position=2)
++            if fid < self.best_fid:
++                self.is_best = True
++                self.best_fid = fid
++            self.fids.append(fid)
++            if len(self.fids) > 3:
++                self.fids.pop(0)
++            ret['metric/fid'] = fid
++            ret['metric/fid-mean'] = sum(self.fids) / len(self.fids)
++            ret['metric/fid-best'] = self.best_fid
++        if 'cityscapes' in self.opt.dataroot and not self.opt.no_mIoU:
++            mIoU = get_cityscapes_mIoU(fakes, names, self.drn_model, self.device,
++                                       table_path=self.opt.table_path,
++                                       data_dir=self.opt.cityscapes_path,
++                                       batch_size=self.opt.eval_batch_size,
++                                       num_workers=self.opt.num_threads, tqdm_position=2)
++            if mIoU > self.best_mIoU:
++                self.is_best = True
++                self.best_mIoU = mIoU
++            self.mIoUs.append(mIoU)
++            if len(self.mIoUs) > 3:
++                self.mIoUs = self.mIoUs[1:]
++            ret['metric/mIoU'] = mIoU
++            ret['metric/mIoU-mean'] = sum(self.mIoUs) / len(self.mIoUs)
++            ret['metric/mIoU-best'] = self.best_mIoU
++
++        self.modules_on_one_gpu.netG.train()
++        torch.cuda.empty_cache()
++        return ret
++
++    def print_networks(self):
++        print('---------- Networks initialized -------------')
++        for name in self.model_names:
++            if isinstance(name, str):
++                net = getattr(self.modules_on_one_gpu, 'net' + name)
++                num_params = 0
++                for param in net.parameters():
++                    num_params += param.numel()
++                print(net)
++                print('[Network %s] Total number of parameters : %.3f M' % (name, num_params / 1e6))
++                if hasattr(self.opt, 'log_dir'):
++                    with open(os.path.join(self.opt.log_dir, 'net' + name + '.txt'), 'w') as f:
++                        f.write(str(net) + '\n')
++                        f.write('[Network %s] Total number of parameters : %.3f M\n' % (name, num_params / 1e6))
++        print('-----------------------------------------------')
++
++    def load_networks(self, verbose=True):
++        self.modules_on_one_gpu.load_networks(verbose)
++        if self.isTrain and self.opt.restore_O_path is not None:
++            for i, optimizer in enumerate(self.optimizers):
++                path = '%s-%d.pth' % (self.opt.restore_O_path, i)
++                util.load_optimizer(optimizer, path, verbose)
++
++    def get_current_visuals(self):
++        """Return visualization images. train.py will display these images with visdom, and save the images to a HTML"""
++        visual_ret = OrderedDict()
++        for name in self.visual_names:
++            if isinstance(name, str) and hasattr(self, name):
++                visual_ret[name] = getattr(self, name)
++        return visual_ret
++
++    def save_networks(self, epoch):
++        self.modules_on_one_gpu.save_networks(epoch, self.save_dir)
++        for i, optimizer in enumerate(self.optimizers):
++            save_filename = '%s_optim-%d.pth' % (epoch, i)
++            save_path = os.path.join(self.save_dir, save_filename)
++            torch.save(optimizer.state_dict(), save_path)
++
++    def calibrate(self, config):
++        self.modules_on_one_gpu.netG.train()
++        config = copy.deepcopy(config)
++        for i, data in enumerate(self.train_dataloader):
++            self.set_input(data)
++            if i == 0:
++                config['calibrate_bn'] = True
++            self.modules_on_one_gpu.config = config
++            self.modules(self.input_semantics, mode='calibrate')
++        self.modules_on_one_gpu.netG.eval()
+Index: models/modules/spade_modules/spade_model_modules.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/models/modules/spade_modules/spade_model_modules.py b/models/modules/spade_modules/spade_model_modules.py
+--- a/models/modules/spade_modules/spade_model_modules.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/models/modules/spade_modules/spade_model_modules.py	(date 1603780107000)
+@@ -1,221 +1,117 @@
+-"""
+-Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
+-Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+-"""
++import copy
++import os
+ 
+ import torch
+-import models.networks as networks
+-import util.util as util
++from torch import nn
++from torchprofile import profile_macs
+ 
++from models import networks
++from models.modules.loss import GANLoss, VGGLoss
++from utils import util
+ 
+-class Pix2PixModel(torch.nn.Module):
+-    @staticmethod
+-    def modify_commandline_options(parser, is_train):
+-        networks.modify_commandline_options(parser, is_train)
+-        return parser
+ 
++class SPADEModelModules(nn.Module):
+     def __init__(self, opt):
+-        super().__init__()
++        opt = copy.deepcopy(opt)
++        if len(opt.gpu_ids) > 0:
++            opt.gpu_ids = opt.gpu_ids[:1]
++        self.gpu_ids = opt.gpu_ids
++        super(SPADEModelModules, self).__init__()
+         self.opt = opt
+-        self.FloatTensor = torch.cuda.FloatTensor if self.use_gpu() \
+-            else torch.FloatTensor
+-        self.ByteTensor = torch.cuda.ByteTensor if self.use_gpu() \
+-            else torch.ByteTensor
+-
+-        self.netG, self.netD, self.netE = self.initialize_networks(opt)
+-
+-        # set loss functions
++        self.model_names = ['G']
++        self.visual_names = ['labels', 'fake_B', 'real_B']
++        self.netG = networks.define_G(opt.netG, init_type=opt.init_type,
++                                      init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
+         if opt.isTrain:
+-            self.criterionGAN = networks.GANLoss(
+-                opt.gan_mode, tensor=self.FloatTensor, opt=self.opt)
+-            self.criterionFeat = torch.nn.L1Loss()
+-            if not opt.no_vgg_loss:
+-                self.criterionVGG = networks.VGGLoss(self.opt.gpu_ids)
+-            if opt.use_vae:
+-                self.KLDLoss = networks.KLDLoss()
+-
+-    # Entry point for all calls involving forward pass
+-    # of deep networks. We used this approach since DataParallel module
+-    # can't parallelize custom functions, we branch to different
+-    # routines based on |mode|.
+-    def forward(self, data, mode):
+-        input_semantics, real_image = self.preprocess_input(data)
+-
+-        if mode == 'generator':
+-            g_loss, generated = self.compute_generator_loss(
+-                input_semantics, real_image)
+-            return g_loss, generated
+-        elif mode == 'discriminator':
+-            d_loss = self.compute_discriminator_loss(
+-                input_semantics, real_image)
+-            return d_loss
+-        elif mode == 'encode_only':
+-            z, mu, logvar = self.encode_z(real_image)
+-            return mu, logvar
+-        elif mode == 'inference':
+-            with torch.no_grad():
+-                fake_image, _ = self.generate_fake(input_semantics, real_image)
+-            return fake_image
++            self.model_names.append('D')
++            self.netD = networks.define_D(opt.netD, init_type=opt.init_type,
++                                          init_gain=opt.init_gain, gpu_ids=self.gpu_ids, opt=opt)
++            self.criterionGAN = GANLoss(opt.gan_mode)
++            self.criterionFeat = nn.L1Loss()
++            self.criterionVGG = VGGLoss()
++            self.optimizers = []
++            self.loss_names = ['G_gan', 'G_feat', 'G_vgg', 'D_real', 'D_fake']
+         else:
+-            raise ValueError("|mode| is invalid")
++            self.netG.eval()
++        self.config = None
+ 
+-    def create_optimizers(self, opt):
+-        G_params = list(self.netG.parameters())
+-        if opt.use_vae:
+-            G_params += list(self.netE.parameters())
+-        if opt.isTrain:
+-            D_params = list(self.netD.parameters())
+-
+-        beta1, beta2 = opt.beta1, opt.beta2
+-        if opt.no_TTUR:
+-            G_lr, D_lr = opt.lr, opt.lr
++    def create_optimizers(self):
++        if self.opt.no_TTUR:
++            beta1, beta2 = self.opt.beta1, self.opt.beta2
++            G_lr, D_lr = self.opt.lr, self.opt.lr
+         else:
+-            G_lr, D_lr = opt.lr / 2, opt.lr * 2
+-
+-        optimizer_G = torch.optim.Adam(G_params, lr=G_lr, betas=(beta1, beta2))
+-        optimizer_D = torch.optim.Adam(D_params, lr=D_lr, betas=(beta1, beta2))
+-
++            beta1, beta2 = 0, 0.9
++            G_lr, D_lr = self.opt.lr / 2, self.opt.lr * 2
++        optimizer_G = torch.optim.Adam(list(self.netG.parameters()), lr=G_lr, betas=(beta1, beta2))
++        optimizer_D = torch.optim.Adam(list(self.netD.parameters()), lr=D_lr, betas=(beta1, beta2))
+         return optimizer_G, optimizer_D
+ 
+-    def save(self, epoch):
+-        util.save_network(self.netG, 'G', epoch, self.opt)
+-        util.save_network(self.netD, 'D', epoch, self.opt)
+-        if self.opt.use_vae:
+-            util.save_network(self.netE, 'E', epoch, self.opt)
+-
+-    ############################################################################
+-    # Private helper methods
+-    ############################################################################
+-
+-    def initialize_networks(self, opt):
+-        netG = networks.define_G(opt)
+-        netD = networks.define_D(opt) if opt.isTrain else None
+-        netE = networks.define_E(opt) if opt.use_vae else None
+-
+-        if not opt.isTrain or opt.continue_train:
+-            netG = util.load_network(netG, 'G', opt.which_epoch, opt)
+-            if opt.isTrain:
+-                netD = util.load_network(netD, 'D', opt.which_epoch, opt)
+-            if opt.use_vae:
+-                netE = util.load_network(netE, 'E', opt.which_epoch, opt)
+-
+-        return netG, netD, netE
+-
+-    # preprocess the input, such as moving the tensors to GPUs and
+-    # transforming the label map to one-hot encoding
+-    # |data|: dictionary of the input data
+-
+-    def preprocess_input(self, data):
+-        # move to GPU and change data types
+-        data['label'] = data['label'].long()
+-        if self.use_gpu():
+-            data['label'] = data['label'].cuda()
+-            data['instance'] = data['instance'].cuda()
+-            data['image'] = data['image'].cuda()
+-
+-        # create one-hot label map
+-        label_map = data['label']
+-        bs, _, h, w = label_map.size()
+-        nc = self.opt.label_nc + 1 if self.opt.contain_dontcare_label \
+-            else self.opt.label_nc
+-        input_label = self.FloatTensor(bs, nc, h, w).zero_()
+-        input_semantics = input_label.scatter_(1, label_map, 1.0)
+-
+-        # concatenate instance map if it exists
+-        if not self.opt.no_instance:
+-            inst_map = data['instance']
+-            instance_edge_map = self.get_edges(inst_map)
+-            input_semantics = torch.cat((input_semantics, instance_edge_map), dim=1)
+-
+-        return input_semantics, data['image']
+-
+-    def compute_generator_loss(self, input_semantics, real_image):
+-        G_losses = {}
++    def forward(self, input_semantics, real_B=None, mode='generate_fake'):
+ 
+-        fake_image, KLD_loss = self.generate_fake(
+-            input_semantics, real_image, compute_kld_loss=self.opt.use_vae)
++        if self.config is not None:
++            self.netG.config = self.config
++        if mode == 'generate_fake':
++            fake_B = self.netG(input_semantics)
++            return fake_B
++        elif mode == 'G_loss':
++            assert real_B is not None
++            return self.compute_G_loss(input_semantics, real_B)
++        elif mode == 'D_loss':
++            assert real_B is not None
++            return self.compute_D_loss(input_semantics, real_B)
++        elif mode == 'calibrate':
++            with torch.no_grad():
++                self.netG(input_semantics)
++        else:
++            raise NotImplementedError('Unknown forward mode [%s]!!!' % mode)
+ 
+-        if self.opt.use_vae:
+-            G_losses['KLD'] = KLD_loss
++    def profile(self, input_semantics):
++        netG = self.netG
++        if isinstance(netG, nn.DataParallel):
++            netG = netG.module
++        if self.config is not None:
++            netG.config = self.config
++        with torch.no_grad():
++            macs = profile_macs(netG, (input_semantics,))
++        params = 0
++        for p in netG.parameters():
++            params += p.numel()
++        return macs, params
+ 
+-        pred_fake, pred_real = self.discriminate(
+-            input_semantics, fake_image, real_image)
+-
+-        G_losses['GAN'] = self.criterionGAN(pred_fake, True,
+-                                            for_discriminator=False)
+-
+-        if not self.opt.no_ganFeat_loss:
+-            num_D = len(pred_fake)
+-            GAN_Feat_loss = self.FloatTensor(1).fill_(0)
+-            for i in range(num_D):  # for each discriminator
+-                # last output is the final prediction, so we exclude it
+-                num_intermediate_outputs = len(pred_fake[i]) - 1
+-                for j in range(num_intermediate_outputs):  # for each layer output
+-                    unweighted_loss = self.criterionFeat(
+-                        pred_fake[i][j], pred_real[i][j].detach())
+-                    GAN_Feat_loss += unweighted_loss * self.opt.lambda_feat / num_D
+-            G_losses['GAN_Feat'] = GAN_Feat_loss
+-
+-        if not self.opt.no_vgg_loss:
+-            G_losses['VGG'] = self.criterionVGG(fake_image, real_image) \
+-                * self.opt.lambda_vgg
++    def compute_G_loss(self, input_semantics, real_B):
++        fake_B = self.netG(input_semantics)
++        pred_fake, pred_real = self.discriminate(input_semantics, fake_B, real_B)
++        loss_G_gan = self.criterionGAN(pred_fake, True, for_discriminator=False) * self.opt.lambda_gan
++        num_D = len(pred_fake)
++        loss_G_feat = 0
++        for i in range(num_D):
++            num_intermediate_outputs = len(pred_fake[i]) - 1
++            for j in range(num_intermediate_outputs):  # for each layer output
++                unweighted_loss = self.criterionFeat(
++                    pred_fake[i][j], pred_real[i][j].detach())
++                loss_G_feat += unweighted_loss * self.opt.lambda_feat / num_D
++        loss_G_vgg = self.criterionVGG(fake_B, real_B) * self.opt.lambda_vgg
++        loss_G = loss_G_gan + loss_G_feat + loss_G_vgg
++        losses = {'loss_G': loss_G, 'G_gan': loss_G_gan,
++                  'G_feat': loss_G_feat, 'G_vgg': loss_G_vgg}
++        return losses
+ 
+-        return G_losses, fake_image
+-
+-    def compute_discriminator_loss(self, input_semantics, real_image):
+-        D_losses = {}
++    def compute_D_loss(self, input_semantics, real_B):
+         with torch.no_grad():
+-            fake_image, _ = self.generate_fake(input_semantics, real_image)
+-            fake_image = fake_image.detach()
+-            fake_image.requires_grad_()
+-
+-        pred_fake, pred_real = self.discriminate(
+-            input_semantics, fake_image, real_image)
+-
+-        D_losses['D_Fake'] = self.criterionGAN(pred_fake, False,
+-                                               for_discriminator=True)
+-        D_losses['D_real'] = self.criterionGAN(pred_real, True,
+-                                               for_discriminator=True)
+-
+-        return D_losses
+-
+-    def encode_z(self, real_image):
+-        mu, logvar = self.netE(real_image)
+-        z = self.reparameterize(mu, logvar)
+-        return z, mu, logvar
+-
+-    def generate_fake(self, input_semantics, real_image, compute_kld_loss=False):
+-        z = None
+-        KLD_loss = None
+-        if self.opt.use_vae:
+-            z, mu, logvar = self.encode_z(real_image)
+-            if compute_kld_loss:
+-                KLD_loss = self.KLDLoss(mu, logvar) * self.opt.lambda_kld
+-
+-        fake_image = self.netG(input_semantics, z=z)
++            fake_B = self.netG(input_semantics)
++        pred_fake, pred_real = self.discriminate(input_semantics, fake_B, real_B)
++        loss_D_fake = self.criterionGAN(pred_fake, False, for_discriminator=True)
++        loss_D_real = self.criterionGAN(pred_real, True, for_discriminator=True)
++        loss_D = loss_D_fake + loss_D_real
++        losses = {'loss_D': loss_D, 'D_fake': loss_D_fake, 'D_real': loss_D_real}
++        return losses
+ 
+-        assert (not compute_kld_loss) or self.opt.use_vae, \
+-            "You cannot compute KLD loss if opt.use_vae == False"
+-
+-        return fake_image, KLD_loss
+-
+-    # Given fake and real image, return the prediction of discriminator
+-    # for each fake and real image.
+-
+-    def discriminate(self, input_semantics, fake_image, real_image):
+-        fake_concat = torch.cat([input_semantics, fake_image], dim=1)
+-        real_concat = torch.cat([input_semantics, real_image], dim=1)
+-
+-        # In Batch Normalization, the fake and real images are
+-        # recommended to be in the same batch to avoid disparate
+-        # statistics in fake and real images.
+-        # So both fake and real images are fed to D all at once.
++    def discriminate(self, input_semantics, fake_B, real_B):
++        fake_concat = torch.cat([input_semantics, fake_B], dim=1)
++        real_concat = torch.cat([input_semantics, real_B], dim=1)
+         fake_and_real = torch.cat([fake_concat, real_concat], dim=0)
+-
+         discriminator_out = self.netD(fake_and_real)
+-
+         pred_fake, pred_real = self.divide_pred(discriminator_out)
+-
+         return pred_fake, pred_real
+ 
+     # Take the prediction of fake and real images from the combined batch
+@@ -234,18 +130,21 @@
+ 
+         return fake, real
+ 
+-    def get_edges(self, t):
+-        edge = self.ByteTensor(t.size()).zero_()
+-        edge[:, :, :, 1:] = edge[:, :, :, 1:] | (t[:, :, :, 1:] != t[:, :, :, :-1])
+-        edge[:, :, :, :-1] = edge[:, :, :, :-1] | (t[:, :, :, 1:] != t[:, :, :, :-1])
+-        edge[:, :, 1:, :] = edge[:, :, 1:, :] | (t[:, :, 1:, :] != t[:, :, :-1, :])
+-        edge[:, :, :-1, :] = edge[:, :, :-1, :] | (t[:, :, 1:, :] != t[:, :, :-1, :])
+-        return edge.float()
++    def load_networks(self, verbose=True):
++        for name in self.model_names:
++            net = getattr(self, 'net' + name, None)
++            path = getattr(self.opt, 'restore_%s_path' % name, None)
++            if path is not None:
++                util.load_network(net, path, verbose)
+ 
+-    def reparameterize(self, mu, logvar):
+-        std = torch.exp(0.5 * logvar)
+-        eps = torch.randn_like(std)
+-        return eps.mul(std) + mu
+-
+-    def use_gpu(self):
+-        return len(self.opt.gpu_ids) > 0
++    def save_networks(self, epoch, save_dir):
++        for name in self.model_names:
++            if isinstance(name, str):
++                save_filename = '%s_net_%s.pth' % (epoch, name)
++                save_path = os.path.join(save_dir, save_filename)
++                net = getattr(self, 'net' + name)
++                if len(self.gpu_ids) > 0 and torch.cuda.is_available():
++                    torch.save(net.cpu().state_dict(), save_path)
++                    net.cuda(self.gpu_ids[0])
++                else:
++                    torch.save(net.cpu().state_dict(), save_path)
+Index: models/modules/munit_architecture/munit_generator.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/models/modules/munit_architecture/munit_generator.py b/models/modules/munit_architecture/munit_generator.py
+--- a/models/modules/munit_architecture/munit_generator.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/models/modules/munit_architecture/munit_generator.py	(date 1610285741000)
+@@ -1,243 +1,9 @@
+-"""
+-Copyright (C) 2018 NVIDIA Corporation.  All rights reserved.
+-Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+-"""
+-from torch import nn
+-from torch.autograd import Variable
+ import torch
+-import torch.nn.functional as F
+-try:
+-    from itertools import izip as zip
+-except ImportError: # will be 3.x series
+-    pass
++from torch import nn
++from torch.nn import functional as F
++
++from models.networks import BaseNetwork
+ 
+-##################################################################################
+-# Discriminator
+-##################################################################################
+-
+-class MsImageDis(nn.Module):
+-    # Multi-scale discriminator architecture
+-    def __init__(self, input_dim, params):
+-        super(MsImageDis, self).__init__()
+-        self.n_layer = params['n_layer']
+-        self.gan_type = params['gan_type']
+-        self.dim = params['dim']
+-        self.norm = params['norm']
+-        self.activ = params['activ']
+-        self.num_scales = params['num_scales']
+-        self.pad_type = params['pad_type']
+-        self.input_dim = input_dim
+-        self.downsample = nn.AvgPool2d(3, stride=2, padding=[1, 1], count_include_pad=False)
+-        self.cnns = nn.ModuleList()
+-        for _ in range(self.num_scales):
+-            self.cnns.append(self._make_net())
+-
+-    def _make_net(self):
+-        dim = self.dim
+-        cnn_x = []
+-        cnn_x += [Conv2dBlock(self.input_dim, dim, 4, 2, 1, norm='none', activation=self.activ, pad_type=self.pad_type)]
+-        for i in range(self.n_layer - 1):
+-            cnn_x += [Conv2dBlock(dim, dim * 2, 4, 2, 1, norm=self.norm, activation=self.activ, pad_type=self.pad_type)]
+-            dim *= 2
+-        cnn_x += [nn.Conv2d(dim, 1, 1, 1, 0)]
+-        cnn_x = nn.Sequential(*cnn_x)
+-        return cnn_x
+-
+-    def forward(self, x):
+-        outputs = []
+-        for model in self.cnns:
+-            outputs.append(model(x))
+-            x = self.downsample(x)
+-        return outputs
+-
+-    def calc_dis_loss(self, input_fake, input_real):
+-        # calculate the loss to train D
+-        outs0 = self.forward(input_fake)
+-        outs1 = self.forward(input_real)
+-        loss = 0
+-
+-        for it, (out0, out1) in enumerate(zip(outs0, outs1)):
+-            if self.gan_type == 'lsgan':
+-                loss += torch.mean((out0 - 0)**2) + torch.mean((out1 - 1)**2)
+-            elif self.gan_type == 'nsgan':
+-                all0 = Variable(torch.zeros_like(out0.data).cuda(), requires_grad=False)
+-                all1 = Variable(torch.ones_like(out1.data).cuda(), requires_grad=False)
+-                loss += torch.mean(F.binary_cross_entropy(F.sigmoid(out0), all0) +
+-                                   F.binary_cross_entropy(F.sigmoid(out1), all1))
+-            else:
+-                assert 0, "Unsupported GAN type: {}".format(self.gan_type)
+-        return loss
+-
+-    def calc_gen_loss(self, input_fake):
+-        # calculate the loss to train G
+-        outs0 = self.forward(input_fake)
+-        loss = 0
+-        for it, (out0) in enumerate(outs0):
+-            if self.gan_type == 'lsgan':
+-                loss += torch.mean((out0 - 1)**2) # LSGAN
+-            elif self.gan_type == 'nsgan':
+-                all1 = Variable(torch.ones_like(out0.data).cuda(), requires_grad=False)
+-                loss += torch.mean(F.binary_cross_entropy(F.sigmoid(out0), all1))
+-            else:
+-                assert 0, "Unsupported GAN type: {}".format(self.gan_type)
+-        return loss
+-
+-##################################################################################
+-# Generator
+-##################################################################################
+-
+-class AdaINGen(nn.Module):
+-    # AdaIN auto-encoder architecture
+-    def __init__(self, input_dim, params):
+-        super(AdaINGen, self).__init__()
+-        dim = params['dim']
+-        style_dim = params['style_dim']
+-        n_downsample = params['n_downsample']
+-        n_res = params['n_res']
+-        activ = params['activ']
+-        pad_type = params['pad_type']
+-        mlp_dim = params['mlp_dim']
+-
+-        # style encoder
+-        self.enc_style = StyleEncoder(4, input_dim, dim, style_dim, norm='none', activ=activ, pad_type=pad_type)
+-
+-        # content encoder
+-        self.enc_content = ContentEncoder(n_downsample, n_res, input_dim, dim, 'in', activ, pad_type=pad_type)
+-        self.dec = Decoder(n_downsample, n_res, self.enc_content.output_dim, input_dim, res_norm='adain', activ=activ, pad_type=pad_type)
+-
+-        # MLP to generate AdaIN parameters
+-        self.mlp = MLP(style_dim, self.get_num_adain_params(self.dec), mlp_dim, 3, norm='none', activ=activ)
+-
+-    def forward(self, images):
+-        # reconstruct an image
+-        content, style_fake = self.encode(images)
+-        images_recon = self.decode(content, style_fake)
+-        return images_recon
+-
+-    def encode(self, images):
+-        # encode an image to its content and style codes
+-        style_fake = self.enc_style(images)
+-        content = self.enc_content(images)
+-        return content, style_fake
+-
+-    def decode(self, content, style):
+-        # decode content and style codes to an image
+-        adain_params = self.mlp(style)
+-        self.assign_adain_params(adain_params, self.dec)
+-        images = self.dec(content)
+-        return images
+-
+-    def assign_adain_params(self, adain_params, model):
+-        # assign the adain_params to the AdaIN layers in model
+-        for m in model.modules():
+-            if m.__class__.__name__ == "AdaptiveInstanceNorm2d":
+-                mean = adain_params[:, :m.num_features]
+-                std = adain_params[:, m.num_features:2*m.num_features]
+-                m.bias = mean.contiguous().view(-1)
+-                m.weight = std.contiguous().view(-1)
+-                if adain_params.size(1) > 2*m.num_features:
+-                    adain_params = adain_params[:, 2*m.num_features:]
+-
+-    def get_num_adain_params(self, model):
+-        # return the number of AdaIN parameters needed by the model
+-        num_adain_params = 0
+-        for m in model.modules():
+-            if m.__class__.__name__ == "AdaptiveInstanceNorm2d":
+-                num_adain_params += 2*m.num_features
+-        return num_adain_params
+-
+-
+-class VAEGen(nn.Module):
+-    # VAE architecture
+-    def __init__(self, input_dim, params):
+-        super(VAEGen, self).__init__()
+-        dim = params['dim']
+-        n_downsample = params['n_downsample']
+-        n_res = params['n_res']
+-        activ = params['activ']
+-        pad_type = params['pad_type']
+-
+-        # content encoder
+-        self.enc = ContentEncoder(n_downsample, n_res, input_dim, dim, 'in', activ, pad_type=pad_type)
+-        self.dec = Decoder(n_downsample, n_res, self.enc.output_dim, input_dim, res_norm='in', activ=activ, pad_type=pad_type)
+-
+-    def forward(self, images):
+-        # This is a reduced VAE implementation where we assume the outputs are multivariate Gaussian distribution with mean = hiddens and std_dev = all ones.
+-        hiddens = self.encode(images)
+-        if self.training == True:
+-            noise = Variable(torch.randn(hiddens.size()).cuda(hiddens.data.get_device()))
+-            images_recon = self.decode(hiddens + noise)
+-        else:
+-            images_recon = self.decode(hiddens)
+-        return images_recon, hiddens
+-
+-    def encode(self, images):
+-        hiddens = self.enc(images)
+-        noise = Variable(torch.randn(hiddens.size()).cuda(hiddens.data.get_device()))
+-        return hiddens, noise
+-
+-    def decode(self, hiddens):
+-        images = self.dec(hiddens)
+-        return images
+-
+-
+-##################################################################################
+-# Encoder and Decoders
+-##################################################################################
+-
+-class StyleEncoder(nn.Module):
+-    def __init__(self, n_downsample, input_dim, dim, style_dim, norm, activ, pad_type):
+-        super(StyleEncoder, self).__init__()
+-        self.model = []
+-        self.model += [Conv2dBlock(input_dim, dim, 7, 1, 3, norm=norm, activation=activ, pad_type=pad_type)]
+-        for i in range(2):
+-            self.model += [Conv2dBlock(dim, 2 * dim, 4, 2, 1, norm=norm, activation=activ, pad_type=pad_type)]
+-            dim *= 2
+-        for i in range(n_downsample - 2):
+-            self.model += [Conv2dBlock(dim, dim, 4, 2, 1, norm=norm, activation=activ, pad_type=pad_type)]
+-        self.model += [nn.AdaptiveAvgPool2d(1)] # global average pooling
+-        self.model += [nn.Conv2d(dim, style_dim, 1, 1, 0)]
+-        self.model = nn.Sequential(*self.model)
+-        self.output_dim = dim
+-
+-    def forward(self, x):
+-        return self.model(x)
+-
+-class ContentEncoder(nn.Module):
+-    def __init__(self, n_downsample, n_res, input_dim, dim, norm, activ, pad_type):
+-        super(ContentEncoder, self).__init__()
+-        self.model = []
+-        self.model += [Conv2dBlock(input_dim, dim, 7, 1, 3, norm=norm, activation=activ, pad_type=pad_type)]
+-        # downsampling blocks
+-        for i in range(n_downsample):
+-            self.model += [Conv2dBlock(dim, 2 * dim, 4, 2, 1, norm=norm, activation=activ, pad_type=pad_type)]
+-            dim *= 2
+-        # residual blocks
+-        self.model += [ResBlocks(n_res, dim, norm=norm, activation=activ, pad_type=pad_type)]
+-        self.model = nn.Sequential(*self.model)
+-        self.output_dim = dim
+-
+-    def forward(self, x):
+-        return self.model(x)
+-
+-class Decoder(nn.Module):
+-    def __init__(self, n_upsample, n_res, dim, output_dim, res_norm='adain', activ='relu', pad_type='zero'):
+-        super(Decoder, self).__init__()
+-
+-        self.model = []
+-        # AdaIN residual blocks
+-        self.model += [ResBlocks(n_res, dim, res_norm, activ, pad_type=pad_type)]
+-        # upsampling blocks
+-        for i in range(n_upsample):
+-            self.model += [nn.Upsample(scale_factor=2),
+-                           Conv2dBlock(dim, dim // 2, 5, 1, 2, norm='ln', activation=activ, pad_type=pad_type)]
+-            dim //= 2
+-        # use reflection padding in the last conv layer
+-        self.model += [Conv2dBlock(dim, output_dim, 7, 1, 3, norm='none', activation='tanh', pad_type=pad_type)]
+-        self.model = nn.Sequential(*self.model)
+-
+-    def forward(self, x):
+-        return self.model(x)
+ 
+ ##################################################################################
+ # Sequential Models
+@@ -253,20 +19,21 @@
+     def forward(self, x):
+         return self.model(x)
+ 
++
+ class MLP(nn.Module):
+     def __init__(self, input_dim, output_dim, dim, n_blk, norm='none', activ='relu'):
+-
+         super(MLP, self).__init__()
+         self.model = []
+         self.model += [LinearBlock(input_dim, dim, norm=norm, activation=activ)]
+         for i in range(n_blk - 2):
+             self.model += [LinearBlock(dim, dim, norm=norm, activation=activ)]
+-        self.model += [LinearBlock(dim, output_dim, norm='none', activation='none')] # no output activations
++        self.model += [LinearBlock(dim, output_dim, norm='none', activation='none')]  # no output activations
+         self.model = nn.Sequential(*self.model)
+ 
+     def forward(self, x):
+         return self.model(x.view(x.size(0), -1))
+ 
++
+ ##################################################################################
+ # Basic Blocks
+ ##################################################################################
+@@ -275,8 +42,8 @@
+         super(ResBlock, self).__init__()
+ 
+         model = []
+-        model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation=activation, pad_type=pad_type)]
+-        model += [Conv2dBlock(dim ,dim, 3, 1, 1, norm=norm, activation='none', pad_type=pad_type)]
++        model += [Conv2dBlock(dim, dim, 3, 1, 1, norm=norm, activation=activation, pad_type=pad_type)]
++        model += [Conv2dBlock(dim, dim, 3, 1, 1, norm=norm, activation='none', pad_type=pad_type)]
+         self.model = nn.Sequential(*model)
+ 
+     def forward(self, x):
+@@ -285,8 +52,9 @@
+         out += residual
+         return out
+ 
++
+ class Conv2dBlock(nn.Module):
+-    def __init__(self, input_dim ,output_dim, kernel_size, stride,
++    def __init__(self, input_dim, output_dim, kernel_size, stride,
+                  padding=0, norm='none', activation='relu', pad_type='zero'):
+         super(Conv2dBlock, self).__init__()
+         self.use_bias = True
+@@ -305,7 +73,6 @@
+         if norm == 'bn':
+             self.norm = nn.BatchNorm2d(norm_dim)
+         elif norm == 'in':
+-            #self.norm = nn.InstanceNorm2d(norm_dim, track_running_stats=True)
+             self.norm = nn.InstanceNorm2d(norm_dim)
+         elif norm == 'ln':
+             self.norm = LayerNorm(norm_dim)
+@@ -346,6 +113,7 @@
+             x = self.activation(x)
+         return x
+ 
++
+ class LinearBlock(nn.Module):
+     def __init__(self, input_dim, output_dim, norm='none', activation='relu'):
+         super(LinearBlock, self).__init__()
+@@ -393,59 +161,6 @@
+             out = self.activation(out)
+         return out
+ 
+-##################################################################################
+-# VGG network definition
+-##################################################################################
+-class Vgg16(nn.Module):
+-    def __init__(self):
+-        super(Vgg16, self).__init__()
+-        self.conv1_1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
+-        self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
+-
+-        self.conv2_1 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
+-        self.conv2_2 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
+-
+-        self.conv3_1 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
+-        self.conv3_2 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+-        self.conv3_3 = nn.Conv2d(256, 256, kernel_size=3, stride=1, padding=1)
+-
+-        self.conv4_1 = nn.Conv2d(256, 512, kernel_size=3, stride=1, padding=1)
+-        self.conv4_2 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+-        self.conv4_3 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+-
+-        self.conv5_1 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+-        self.conv5_2 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+-        self.conv5_3 = nn.Conv2d(512, 512, kernel_size=3, stride=1, padding=1)
+-
+-    def forward(self, X):
+-        h = F.relu(self.conv1_1(X), inplace=True)
+-        h = F.relu(self.conv1_2(h), inplace=True)
+-        # relu1_2 = h
+-        h = F.max_pool2d(h, kernel_size=2, stride=2)
+-
+-        h = F.relu(self.conv2_1(h), inplace=True)
+-        h = F.relu(self.conv2_2(h), inplace=True)
+-        # relu2_2 = h
+-        h = F.max_pool2d(h, kernel_size=2, stride=2)
+-
+-        h = F.relu(self.conv3_1(h), inplace=True)
+-        h = F.relu(self.conv3_2(h), inplace=True)
+-        h = F.relu(self.conv3_3(h), inplace=True)
+-        # relu3_3 = h
+-        h = F.max_pool2d(h, kernel_size=2, stride=2)
+-
+-        h = F.relu(self.conv4_1(h), inplace=True)
+-        h = F.relu(self.conv4_2(h), inplace=True)
+-        h = F.relu(self.conv4_3(h), inplace=True)
+-        # relu4_3 = h
+-
+-        h = F.relu(self.conv5_1(h), inplace=True)
+-        h = F.relu(self.conv5_2(h), inplace=True)
+-        h = F.relu(self.conv5_3(h), inplace=True)
+-        relu5_3 = h
+-
+-        return relu5_3
+-        # return [relu1_2, relu2_2, relu3_3, relu4_3]
+ 
+ ##################################################################################
+ # Normalization layers
+@@ -459,21 +174,16 @@
+         # weight and bias are dynamically assigned
+         self.weight = None
+         self.bias = None
+-        # just dummy buffers, not used
+-        self.register_buffer('running_mean', torch.zeros(num_features))
+-        self.register_buffer('running_var', torch.ones(num_features))
+ 
+     def forward(self, x):
+         assert self.weight is not None and self.bias is not None, "Please assign weight and bias before calling AdaIN!"
+         b, c = x.size(0), x.size(1)
+-        running_mean = self.running_mean.repeat(b)
+-        running_var = self.running_var.repeat(b)
+ 
+         # Apply instance norm
+         x_reshaped = x.contiguous().view(1, b * c, *x.size()[2:])
+ 
+         out = F.batch_norm(
+-            x_reshaped, running_mean, running_var, self.weight, self.bias,
++            x_reshaped, None, None, self.weight, self.bias,
+             True, self.momentum, self.eps)
+ 
+         return out.view(b, c, *x.size()[2:])
+@@ -495,7 +205,6 @@
+ 
+     def forward(self, x):
+         shape = [-1] + [1] * (x.dim() - 1)
+-        # print(x.size())
+         if x.size(0) == 1:
+             # These two lines run much faster in pytorch 0.4 than the two lines listed below.
+             mean = x.view(-1).mean().view(*shape)
+@@ -511,6 +220,7 @@
+             x = x * self.gamma.view(*shape) + self.beta.view(*shape)
+         return x
+ 
++
+ def l2normalize(v, eps=1e-12):
+     return v / (v.norm() + eps)
+ 
+@@ -520,6 +230,7 @@
+     Based on the paper "Spectral Normalization for Generative Adversarial Networks" by Takeru Miyato, Toshiki Kataoka, Masanori Koyama, Yuichi Yoshida
+     and the Pytorch implementation https://github.com/christiancosgrove/pytorch-spectral-normalization-gan
+     """
++
+     def __init__(self, module, name='weight', power_iterations=1):
+         super(SpectralNorm, self).__init__()
+         self.module = module
+@@ -535,8 +246,8 @@
+ 
+         height = w.data.shape[0]
+         for _ in range(self.power_iterations):
+-            v.data = l2normalize(torch.mv(torch.t(w.view(height,-1).data), u.data))
+-            u.data = l2normalize(torch.mv(w.view(height,-1).data, v.data))
++            v.data = l2normalize(torch.mv(torch.t(w.view(height, -1).data), u.data))
++            u.data = l2normalize(torch.mv(w.view(height, -1).data, v.data))
+ 
+         # sigma = torch.dot(u.data, torch.mv(w.view(height,-1).data, v.data))
+         sigma = u.dot(w.view(height, -1).mv(v))
+@@ -551,7 +262,6 @@
+         except AttributeError:
+             return False
+ 
+-
+     def _make_params(self):
+         w = getattr(self.module, self.name)
+ 
+@@ -570,7 +280,145 @@
+         self.module.register_parameter(self.name + "_v", v)
+         self.module.register_parameter(self.name + "_bar", w_bar)
+ 
+-
+     def forward(self, *args):
+         self._update_u_v()
+-        return self.module.forward(*args)
+\ No newline at end of file
++        return self.module.forward(*args)
++
++
++##################################################################################
++# Generator
++##################################################################################
++class AdaINGenerator(BaseNetwork):
++    # AdaIN auto-encoder architecture
++    def __init__(self, opt):
++        super(AdaINGenerator, self).__init__()
++        self.opt = opt
++        input_dim = opt.input_nc
++        dim = opt.ngf
++        style_dim = opt.style_dim
++        n_downsample = opt.n_downsample
++        n_res = opt.n_res
++        activ = opt.activ
++        pad_type = opt.pad_type
++        mlp_dim = opt.mlp_dim
++        no_style_encoder = opt.no_style_encoder
++        if not no_style_encoder:
++            self.enc_style = StyleEncoder(4, input_dim, dim, style_dim, norm='none', activ=activ, pad_type=pad_type)
++
++        # content encoder
++        self.enc_content = ContentEncoder(n_downsample, n_res, input_dim, dim, 'in', activ, pad_type=pad_type)
++        self.dec = Decoder(n_downsample, n_res, self.enc_content.output_dim, input_dim, res_norm='adain', activ=activ,
++                           pad_type=pad_type)
++
++        # MLP to generate AdaIN parameters
++        self.mlp = MLP(style_dim, self.get_num_adain_params(self.dec), mlp_dim, 3, norm='none', activ=activ)
++
++    def forward(self, images, z=None):
++        # reconstruct an image
++        if z is None:
++            content, style_fake = self.encode(images)
++        else:
++            content, _ = self.encode(images, need_style=False)
++            style_fake = z
++        images_recon = self.decode(content, style_fake)
++        return images_recon
++
++    def encode(self, images, need_content=True, need_style=True):
++        # encode an image to its content and style codes
++        if need_style:
++            assert hasattr(self, 'enc_style')
++            style_fake = self.enc_style(images)
++        else:
++            style_fake = None
++        if need_content:
++            content = self.enc_content(images)
++        else:
++            content = None
++        return content, style_fake
++
++    def decode(self, content, style):
++        # decode content and style codes to an image
++        adain_params = self.mlp(style)
++        self.assign_adain_params(adain_params, self.dec)
++        images = self.dec(content)
++        return images
++
++    def assign_adain_params(self, adain_params, model):
++        # assign the adain_params to the AdaIN layers in model
++        for m in model.modules():
++            if m.__class__.__name__ == "AdaptiveInstanceNorm2d":
++                mean = adain_params[:, :m.num_features]
++                std = adain_params[:, m.num_features:2 * m.num_features]
++                m.bias = mean.contiguous().view(-1)
++                m.weight = std.contiguous().view(-1)
++                if adain_params.size(1) > 2 * m.num_features:
++                    adain_params = adain_params[:, 2 * m.num_features:]
++
++    def get_num_adain_params(self, model):
++        # return the number of AdaIN parameters needed by the model
++        num_adain_params = 0
++        for m in model.modules():
++            if m.__class__.__name__ == "AdaptiveInstanceNorm2d":
++                num_adain_params += 2 * m.num_features
++        return num_adain_params
++
++
++##################################################################################
++# Encoder and Decoders
++##################################################################################
++
++class StyleEncoder(nn.Module):
++    def __init__(self, n_downsample, input_dim, dim, style_dim, norm, activ, pad_type):
++        super(StyleEncoder, self).__init__()
++        self.model = []
++        self.model += [Conv2dBlock(input_dim, dim, 7, 1, 3, norm=norm, activation=activ, pad_type=pad_type)]
++        for i in range(2):
++            self.model += [Conv2dBlock(dim, 2 * dim, 4, 2, 1, norm=norm, activation=activ, pad_type=pad_type)]
++            dim *= 2
++        for i in range(n_downsample - 2):
++            self.model += [Conv2dBlock(dim, dim, 4, 2, 1, norm=norm, activation=activ, pad_type=pad_type)]
++        self.model += [nn.AdaptiveAvgPool2d(1)]  # global average pooling
++        self.model += [nn.Conv2d(dim, style_dim, 1, 1, 0)]
++        self.model = nn.Sequential(*self.model)
++        self.output_dim = dim
++
++    def forward(self, x):
++        return self.model(x)
++
++
++class ContentEncoder(nn.Module):
++    def __init__(self, n_downsample, n_res, input_dim, dim, norm, activ, pad_type):
++        super(ContentEncoder, self).__init__()
++        self.model = []
++        self.model += [Conv2dBlock(input_dim, dim, 7, 1, 3, norm=norm, activation=activ, pad_type=pad_type)]
++        # downsampling blocks
++        for i in range(n_downsample):
++            self.model += [Conv2dBlock(dim, 2 * dim, 4, 2, 1, norm=norm, activation=activ, pad_type=pad_type)]
++            dim *= 2
++        # residual blocks
++        self.model += [ResBlocks(n_res, dim, norm=norm, activation=activ, pad_type=pad_type)]
++        self.model = nn.Sequential(*self.model)
++        self.output_dim = dim
++
++    def forward(self, x):
++        return self.model(x)
++
++
++class Decoder(nn.Module):
++    def __init__(self, n_upsample, n_res, dim, output_dim, res_norm='adain', activ='relu', pad_type='zero'):
++        super(Decoder, self).__init__()
++
++        self.model = []
++        # AdaIN residual blocks
++        self.model += [ResBlocks(n_res, dim, res_norm, activ, pad_type=pad_type)]
++        # upsampling blocks
++        for i in range(n_upsample):
++            self.model += [nn.Upsample(scale_factor=2),
++                           Conv2dBlock(dim, dim // 2, 5, 1, 2, norm='ln', activation=activ, pad_type=pad_type)]
++            dim //= 2
++        # use reflection padding in the last conv layer
++        self.model += [Conv2dBlock(dim, output_dim, 7, 1, 3, norm='none', activation='tanh', pad_type=pad_type)]
++        self.model = nn.Sequential(*self.model)
++
++    def forward(self, x):
++        return self.model(x)
+Index: models/modules/spade_architecture/normalization.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/models/modules/spade_architecture/normalization.py b/models/modules/spade_architecture/normalization.py
+--- a/models/modules/spade_architecture/normalization.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/models/modules/spade_architecture/normalization.py	(date 1592234894000)
+@@ -4,12 +4,16 @@
+ """
+ 
+ import re
+-import torch
++
+ import torch.nn as nn
+ import torch.nn.functional as F
+-from models.networks.sync_batchnorm import SynchronizedBatchNorm2d
+ import torch.nn.utils.spectral_norm as spectral_norm
+ 
++from models.modules.mobile_modules import SeparableConv2d
++from models.modules.super_modules import SuperConv2d, SuperSeparableConv2d, SuperSynchronizedBatchNorm2d
++from models.modules.sync_batchnorm import SynchronizedBatchNorm2d
++from models.networks import get_norm_layer
++
+ 
+ # Returns a function that creates a normalization function
+ # that does not condition on semantic map
+@@ -63,12 +67,61 @@
+ # Also, the other arguments are
+ # |norm_nc|: the #channels of the normalized activations, hence the output dim of SPADE
+ # |label_nc|: the #channels of the input semantic map, hence the input dim of SPADE
++class MobileSPADE(nn.Module):
++    def __init__(self, config_text, norm_nc, label_nc, nhidden=128, separable_conv_norm='none'):
++        super(MobileSPADE, self).__init__()
++
++        assert config_text.startswith('spade')
++        parsed = re.search(r'spade(\D+)(\d)x\d', config_text)
++        param_free_norm_type = str(parsed.group(1))
++        ks = int(parsed.group(2))
++
++        if param_free_norm_type == 'instance':
++            self.param_free_norm = nn.InstanceNorm2d(norm_nc, affine=False)
++        elif param_free_norm_type == 'syncbatch':
++            self.param_free_norm = SynchronizedBatchNorm2d(norm_nc, affine=False)
++        elif param_free_norm_type == 'batch':
++            self.param_free_norm = nn.BatchNorm2d(norm_nc, affine=False)
++        else:
++            raise ValueError('%s is not a recognized param-free norm type in SPADE'
++                             % param_free_norm_type)
++
++        # The dimension of the intermediate embedding space. Yes, hardcoded.
++
++        pw = ks // 2
++        self.mlp_shared = nn.Sequential(
++            nn.Conv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
++            nn.ReLU()
++        )
++        norm_layer = get_norm_layer(separable_conv_norm)
++        self.mlp_gamma = SeparableConv2d(nhidden, norm_nc, kernel_size=ks,
++                                         padding=pw, norm_layer=norm_layer)
++        self.mlp_beta = SeparableConv2d(nhidden, norm_nc, kernel_size=ks,
++                                        padding=pw, norm_layer=norm_layer)
++
++    def forward(self, x, segmap):
++
++        # Part 1. generate parameter-free normalized activations
++        normalized = self.param_free_norm(x)
++
++        # Part 2. produce scaling and bias conditioned on semantic map
++        segmap = F.interpolate(segmap, size=x.size()[2:], mode='nearest')
++        actv = self.mlp_shared(segmap)
++        gamma = self.mlp_gamma(actv)
++        beta = self.mlp_beta(actv)
++
++        # apply scale and bias
++        out = normalized * (1 + gamma) + beta
++
++        return out
++
++
+ class SPADE(nn.Module):
+-    def __init__(self, config_text, norm_nc, label_nc):
+-        super().__init__()
++    def __init__(self, config_text, norm_nc, label_nc, nhidden=128):
++        super(SPADE, self).__init__()
+ 
+         assert config_text.startswith('spade')
+-        parsed = re.search('spade(\D+)(\d)x\d', config_text)
++        parsed = re.search(r'spade(\D+)(\d)x\d', config_text)
+         param_free_norm_type = str(parsed.group(1))
+         ks = int(parsed.group(2))
+ 
+@@ -83,7 +136,6 @@
+                              % param_free_norm_type)
+ 
+         # The dimension of the intermediate embedding space. Yes, hardcoded.
+-        nhidden = 128
+ 
+         pw = ks // 2
+         self.mlp_shared = nn.Sequential(
+@@ -108,3 +160,93 @@
+         out = normalized * (1 + gamma) + beta
+ 
+         return out
++
++
++class SuperMobileSPADE(nn.Module):
++    def __init__(self, config_text, norm_nc, label_nc, nhidden=128):
++        super(SuperMobileSPADE, self).__init__()
++
++        assert config_text.startswith('spade')
++        parsed = re.search(r'spade(\D+)(\d)x\d', config_text)
++        param_free_norm_type = str(parsed.group(1))
++        ks = int(parsed.group(2))
++
++        if param_free_norm_type == 'instance':
++            self.param_free_norm = nn.InstanceNorm2d(norm_nc, affine=False)
++        elif param_free_norm_type == 'syncbatch':
++            self.param_free_norm = SuperSynchronizedBatchNorm2d(norm_nc, affine=False)
++        elif param_free_norm_type == 'batch':
++            self.param_free_norm = nn.BatchNorm2d(norm_nc, affine=False)
++        else:
++            raise ValueError('%s is not a recognized param-free norm type in SPADE'
++                             % param_free_norm_type)
++
++        # The dimension of the intermediate embedding space. Yes, hardcoded.
++
++        pw = ks // 2
++        self.mlp_shared = nn.Sequential(
++            SuperConv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
++            nn.ReLU()
++        )
++        self.mlp_gamma = SuperSeparableConv2d(nhidden, norm_nc, kernel_size=ks, padding=pw)
++        self.mlp_beta = SuperSeparableConv2d(nhidden, norm_nc, kernel_size=ks, padding=pw)
++
++    def forward(self, x, segmap, config, verbose=False):
++        # print('###', config, self.param_free_norm)
++        # Part 1. generate parameter-free normalized activations
++        normalized = self.param_free_norm(x, config)
++
++        # Part 2. produce scaling and bias conditioned on semantic map
++        segmap = F.interpolate(segmap, size=x.size()[2:], mode='nearest')
++        channel = config['hidden']
++        actv = self.mlp_shared[0](segmap, {'channel': channel})
++        actv = self.mlp_shared[1](actv)
++        gamma = self.mlp_gamma(actv, {'channel': x.shape[1]})
++        beta = self.mlp_beta(actv, {'channel': x.shape[1]})
++
++        # apply scale and bias
++        out = normalized * (1 + gamma) + beta
++
++        return out
++
++
++class SubMobileSPADE(nn.Module):
++    def __init__(self, config_text, norm_nc, label_nc, nhidden, oc):
++        super(SubMobileSPADE, self).__init__()
++
++        assert config_text.startswith('spade')
++        parsed = re.search(r'spade(\D+)(\d)x\d', config_text)
++        param_free_norm_type = str(parsed.group(1))
++        ks = int(parsed.group(2))
++
++        if param_free_norm_type == 'syncbatch':
++            self.param_free_norm = SuperSynchronizedBatchNorm2d(norm_nc, affine=False)
++        else:
++            raise ValueError('%s is not a recognized param-free norm type in SPADE'
++                             % param_free_norm_type)
++
++        # The dimension of the intermediate embedding space. Yes, hardcoded.
++
++        pw = ks // 2
++        self.mlp_shared = nn.Sequential(
++            nn.Conv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
++            nn.ReLU()
++        )
++        self.mlp_gamma = SeparableConv2d(nhidden, oc, kernel_size=ks, padding=pw)
++        self.mlp_beta = SeparableConv2d(nhidden, oc, kernel_size=ks, padding=pw)
++
++    def forward(self, x, segmap):
++
++        # Part 1. generate parameter-free normalized activations
++        normalized = self.param_free_norm(x)
++
++        # Part 2. produce scaling and bias conditioned on semantic map
++        segmap = F.interpolate(segmap, size=x.size()[2:], mode='nearest')
++        actv = self.mlp_shared(segmap)
++        gamma = self.mlp_gamma(actv)
++        beta = self.mlp_beta(actv)
++
++        # apply scale and bias
++        out = normalized * (1 + gamma) + beta
++
++        return out
+Index: data/spade_dataset.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/data/spade_dataset.py b/data/spade_dataset.py
+--- a/data/spade_dataset.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/data/spade_dataset.py	(date 1609773310000)
+@@ -3,72 +3,60 @@
+ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+ """
+ 
+-from data.base_dataset import BaseDataset, get_params, get_transform
++import os
++
+ from PIL import Image
+-import util.util as util
+-import os
++
++from data.base_dataset import BaseDataset, get_params, get_transform
++from utils import util
+ 
+ 
+-class Pix2pixDataset(BaseDataset):
++class SPADEDataset(BaseDataset):
++
++    def __init__(self, opt):
++        super(SPADEDataset, self).__init__(opt)
++        self.initialize(opt)
++
+     @staticmethod
+     def modify_commandline_options(parser, is_train):
+         parser.add_argument('--no_pairing_check', action='store_true',
+                             help='If specified, skip sanity check of correct label-image file pairing')
++        parser.add_argument('--no_instance', action='store_true',
++                            help='if specified, do *not* add instance map as input')
++        parser.add_argument('--contain_dontcare_label', action='store_true',
++                            help='if the label map contains dontcare label (dontcare=255)')
++        parser.add_argument('--meta_path', type=str, default=None,
++                            help='the path to the meta file')
+         return parser
+ 
+-    def initialize(self, opt):
+-        self.opt = opt
+-
+-        label_paths, image_paths, instance_paths = self.get_paths(opt)
+-
+-        util.natural_sort(label_paths)
+-        util.natural_sort(image_paths)
+-        if not opt.no_instance:
+-            util.natural_sort(instance_paths)
+-
+-        label_paths = label_paths[:opt.max_dataset_size]
+-        image_paths = image_paths[:opt.max_dataset_size]
+-        instance_paths = instance_paths[:opt.max_dataset_size]
+-
+-        if not opt.no_pairing_check:
+-            for path1, path2 in zip(label_paths, image_paths):
+-                assert self.paths_match(path1, path2), \
+-                    "The label-image pair (%s, %s) do not look like the right pair because the filenames are quite different. Are you sure about the pairing? Please see data/pix2pix_dataset.py to see what is going on, and use --no_pairing_check to bypass this." % (path1, path2)
+-
+-        self.label_paths = label_paths
+-        self.image_paths = image_paths
+-        self.instance_paths = instance_paths
+-
+-        size = len(self.label_paths)
+-        self.dataset_size = size
+-
+-    def get_paths(self, opt):
+-        label_paths = []
+-        image_paths = []
+-        instance_paths = []
+-        assert False, "A subclass of Pix2pixDataset must override self.get_paths(self, opt)"
+-        return label_paths, image_paths, instance_paths
+-
+     def paths_match(self, path1, path2):
+-        filename1_without_ext = os.path.splitext(os.path.basename(path1))[0]
+-        filename2_without_ext = os.path.splitext(os.path.basename(path2))[0]
+-        return filename1_without_ext == filename2_without_ext
++        raise NotImplementedError
+ 
+     def __getitem__(self, index):
+         # Label Image
+         label_path = self.label_paths[index]
+-        label = Image.open(label_path)
++        if not self.opt.load_in_memory or self.label_cache.get(index) is None:
++            label = Image.open(label_path)
++            if self.opt.load_in_memory:
++                self.label_cache[index] = label
++        else:
++            label = self.label_cache[index]
+         params = get_params(self.opt, label.size)
+-        transform_label = get_transform(self.opt, params, method=Image.NEAREST, normalize=False)
++        transform_label = get_transform(self.opt, params, method=Image.NEAREST, normalized=False)
+         label_tensor = transform_label(label) * 255.0
+-        label_tensor[label_tensor == 255] = self.opt.label_nc  # 'unknown' is opt.label_nc
++        label_tensor[label_tensor == 255] = self.opt.input_nc  # 'unknown' is opt.input_nc
+ 
+         # input image (real images)
+         image_path = self.image_paths[index]
+         assert self.paths_match(label_path, image_path), \
+             "The label_path %s and image_path %s don't match." % \
+             (label_path, image_path)
+-        image = Image.open(image_path)
++        if not self.opt.load_in_memory or self.image_cache.get(index) is None:
++            image = Image.open(image_path)
++            if self.opt.load_in_memory:
++                self.image_cache[index] = image
++        else:
++            image = self.image_cache[index]
+         image = image.convert('RGB')
+ 
+         transform_image = get_transform(self.opt, params)
+@@ -79,26 +67,79 @@
+             instance_tensor = 0
+         else:
+             instance_path = self.instance_paths[index]
+-            instance = Image.open(instance_path)
++            if not self.opt.load_in_memory or self.instance_cache.get(index) is None:
++                instance = Image.open(instance_path)
++                if self.opt.load_in_memory:
++                    self.instance_cache[index] = instance
++            else:
++                instance = self.instance_cache[index]
+             if instance.mode == 'L':
+                 instance_tensor = transform_label(instance) * 255
+                 instance_tensor = instance_tensor.long()
+             else:
+                 instance_tensor = transform_label(instance)
+ 
+-        input_dict = {'label': label_tensor,
+-                      'instance': instance_tensor,
+-                      'image': image_tensor,
+-                      'path': image_path,
+-                      }
++        input_dict = {
++            'label': label_tensor,
++            'instance': instance_tensor,
++            'image': image_tensor,
++            'path': image_path,
++        }
+ 
+         # Give subclasses a chance to modify the final output
+         self.postprocess(input_dict)
+ 
+         return input_dict
+ 
++    def initialize(self, opt):
++        self.opt = opt
++
++        if opt.phase == 'train' and opt.meta_path is not None:
++            label_paths, image_paths, instance_paths = [], [], []
++            with open(opt.meta_path, 'r') as f:
++                lines = f.readlines()
++            for line in lines:
++                splits = line.strip().split(' ')
++                label_paths.append(os.path.join(opt.dataroot, splits[0]))
++                image_paths.append(os.path.join(opt.dataroot, splits[1]))
++                instance_paths.append(os.path.join(opt.dataroot, splits[2]))
++        else:
++            label_paths, image_paths, instance_paths = self.get_paths(opt)
++
++        util.natural_sort(label_paths)
++        util.natural_sort(image_paths)
++        if not opt.no_instance:
++            util.natural_sort(instance_paths)
++
++        if opt.max_dataset_size > 0:
++            label_paths = label_paths[:opt.max_dataset_size]
++            image_paths = image_paths[:opt.max_dataset_size]
++            instance_paths = instance_paths[:opt.max_dataset_size]
++
++        if not opt.no_pairing_check:
++            for path1, path2 in zip(label_paths, image_paths):
++                assert self.paths_match(path1, path2), \
++                    "The label-image pair (%s, %s) do not look like the right pair because the filenames are quite different. Are you sure about the pairing? Please see data/pix2pix_dataset.py to see what is going on, and use --no_pairing_check to bypass this." % (
++                        path1, path2)
++
++        self.label_paths = label_paths
++        self.image_paths = image_paths
++        self.instance_paths = instance_paths
++
++        size = len(self.label_paths)
++        self.dataset_size = size
++        self.label_cache = {}
++        self.image_cache = {}
++        self.instance_cache = {}
++
+     def postprocess(self, input_dict):
+         return input_dict
+ 
+     def __len__(self):
+-        return self.dataset_size
++        if self.opt.max_dataset_size == -1:
++            return self.dataset_size
++        else:
++            return self.opt.max_dataset_size
++
++    def get_paths(self, opt):
++        raise NotImplementedError
+Index: models/modules/spade_architecture/super_mobile_spade_generator.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/models/modules/spade_architecture/super_mobile_spade_generator.py b/models/modules/spade_architecture/super_mobile_spade_generator.py
+--- a/models/modules/spade_architecture/super_mobile_spade_generator.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/models/modules/spade_architecture/super_mobile_spade_generator.py	(date 1599021076000)
+@@ -1,59 +1,93 @@
+-"""
+-Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
+-Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+-"""
++from torch import nn
++from torch.nn import functional as F
++
++from models.modules.super_modules import SuperConv2d
++from models.networks import BaseNetwork
++from .normalization import SuperMobileSPADE
++
++
++class SuperMobileSPADEResnetBlock(nn.Module):
++    def __init__(self, fin, fout, opt):
++        super(SuperMobileSPADEResnetBlock, self).__init__()
++        # Attributes
++        self.learned_shortcut = (fin != fout)
++        fmiddle = min(fin, fout)
++
++        # create conv layers
++        self.conv_0 = SuperConv2d(fin, fmiddle, kernel_size=3, padding=1)
++        self.conv_1 = SuperConv2d(fmiddle, fout, kernel_size=3, padding=1)
++        if self.learned_shortcut:
++            self.conv_s = SuperConv2d(fin, fout, kernel_size=1, bias=False)
++
++        # define normalization layers
++        spade_config_str = opt.norm_G
++        self.norm_0 = SuperMobileSPADE(spade_config_str, fin, opt.semantic_nc, nhidden=opt.ngf * 2)
++        self.norm_1 = SuperMobileSPADE(spade_config_str, fmiddle, opt.semantic_nc, nhidden=opt.ngf * 2)
++        if self.learned_shortcut:
++            self.norm_s = SuperMobileSPADE(spade_config_str, fin, opt.semantic_nc, nhidden=opt.ngf * 2)
++
++    # note the resnet block with SPADE also takes in |seg|,
++    # the semantic segmentation map as input
++    def forward(self, x, seg, config, verbose=False):
++        # if verbose:
++        #     print(config)
++        #     print(self.learned_shortcut)
++        #     print(x.shape)
++        x_s = self.shortcut(x, seg, config)
+ 
+-import torch
+-import torch.nn as nn
+-import torch.nn.functional as F
+-from models.networks.base_network import BaseNetwork
+-from models.networks.normalization import get_nonspade_norm_layer
+-from models.networks.architecture import ResnetBlock as ResnetBlock
+-from models.networks.architecture import SPADEResnetBlock as SPADEResnetBlock
++        dx = self.conv_0(self.actvn(self.norm_0(x, seg, config, verbose=verbose)), config)
++        if self.learned_shortcut:
++            dx = self.conv_1(self.actvn(self.norm_1(dx, seg, config)), config)
++        else:
++            dx = self.conv_1(self.actvn(self.norm_1(dx, seg, config)), {'channel': x.shape[1]})
+ 
++        out = x_s + dx
+ 
+-class SPADEGenerator(BaseNetwork):
++        return out
++
++    def shortcut(self, x, seg, config):
++        if self.learned_shortcut:
++            x_s = self.conv_s(self.norm_s(x, seg, config), config)
++        else:
++            x_s = x
++        return x_s
++
++    def actvn(self, x):
++        return F.leaky_relu(x, 2e-1)
++
++
++class SuperMobileSPADEGenerator(BaseNetwork):
+     @staticmethod
+     def modify_commandline_options(parser, is_train):
+-        parser.set_defaults(norm_G='spectralspadesyncbatch3x3')
+-        parser.add_argument('--num_upsampling_layers',
+-                            choices=('normal', 'more', 'most'), default='normal',
+-                            help="If 'more', adds upsampling layer between the two middle resnet blocks. If 'most', also add one more upsampling + resnet layer at the end of the generator")
+-
+         return parser
+ 
+     def __init__(self, opt):
+-        super().__init__()
++        super(SuperMobileSPADEGenerator, self).__init__()
+         self.opt = opt
+         nf = opt.ngf
+ 
+         self.sw, self.sh = self.compute_latent_vector_size(opt)
+ 
+-        if opt.use_vae:
+-            # In case of VAE, we will sample from random z vector
+-            self.fc = nn.Linear(opt.z_dim, 16 * nf * self.sw * self.sh)
+-        else:
+-            # Otherwise, we make the network deterministic by starting with
+-            # downsampled segmentation map instead of random z
+-            self.fc = nn.Conv2d(self.opt.semantic_nc, 16 * nf, 3, padding=1)
++        # downsampled segmentation map instead of random z
++        self.fc = SuperConv2d(self.opt.semantic_nc, 16 * nf, 3, padding=1)
+ 
+-        self.head_0 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
++        self.head_0 = SuperMobileSPADEResnetBlock(16 * nf, 16 * nf, opt)
+ 
+-        self.G_middle_0 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
+-        self.G_middle_1 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
++        self.G_middle_0 = SuperMobileSPADEResnetBlock(16 * nf, 16 * nf, opt)
++        self.G_middle_1 = SuperMobileSPADEResnetBlock(16 * nf, 16 * nf, opt)
+ 
+-        self.up_0 = SPADEResnetBlock(16 * nf, 8 * nf, opt)
+-        self.up_1 = SPADEResnetBlock(8 * nf, 4 * nf, opt)
+-        self.up_2 = SPADEResnetBlock(4 * nf, 2 * nf, opt)
+-        self.up_3 = SPADEResnetBlock(2 * nf, 1 * nf, opt)
++        self.up_0 = SuperMobileSPADEResnetBlock(16 * nf, 8 * nf, opt)
++        self.up_1 = SuperMobileSPADEResnetBlock(8 * nf, 4 * nf, opt)
++        self.up_2 = SuperMobileSPADEResnetBlock(4 * nf, 2 * nf, opt)
++        self.up_3 = SuperMobileSPADEResnetBlock(2 * nf, 1 * nf, opt)
+ 
+         final_nc = nf
+ 
+         if opt.num_upsampling_layers == 'most':
+-            self.up_4 = SPADEResnetBlock(1 * nf, nf // 2, opt)
++            self.up_4 = SuperMobileSPADEResnetBlock(1 * nf, nf // 2, opt)
+             final_nc = nf // 2
+ 
+-        self.conv_img = nn.Conv2d(final_nc, 3, 3, padding=1)
++        self.conv_img = SuperConv2d(final_nc, 3, 3, padding=1)
+ 
+         self.up = nn.Upsample(scale_factor=2)
+ 
+@@ -68,115 +102,74 @@
+             raise ValueError('opt.num_upsampling_layers [%s] not recognized' %
+                              opt.num_upsampling_layers)
+ 
+-        sw = opt.crop_size // (2**num_up_layers)
++        sw = opt.crop_size // (2 ** num_up_layers)
+         sh = round(sw / opt.aspect_ratio)
+ 
+         return sw, sh
+ 
+-    def forward(self, input, z=None):
++    def forward(self, input, mapping_layers=[]):
+         seg = input
++        ret_acts = {}
+ 
+-        if self.opt.use_vae:
+-            # we sample z from unit normal and reshape the tensor
+-            if z is None:
+-                z = torch.randn(input.size(0), self.opt.z_dim,
+-                                dtype=torch.float32, device=input.get_device())
+-            x = self.fc(z)
+-            x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
+-        else:
+-            # we downsample segmap and run convolution
+-            x = F.interpolate(seg, size=(self.sh, self.sw))
+-            x = self.fc(x)
++        # we downsample segmap and run convolution
++        x = F.interpolate(seg, size=(self.sh, self.sw))
++        channel = self.config['channels'][0]
++        x = self.fc(x, {'channel': channel * 16})
++        if 'fc' in mapping_layers:
++            ret_acts['fc'] = x
+ 
+-        x = self.head_0(x, seg)
++        channel = self.config['channels'][1]
++        x = self.head_0(x, seg, {'channel': channel * 16, 'hidden': channel * 2,
++                                 'calibrate_bn': self.config.get('calibrate_bn', False)})
++        if 'head_0' in mapping_layers:
++            ret_acts['head_0'] = x
+ 
+         x = self.up(x)
+-        x = self.G_middle_0(x, seg)
++        channel = self.config['channels'][2]
++        x = self.G_middle_0(x, seg, {'channel': channel * 16, 'hidden': channel * 2,
++                                     'calibrate_bn': self.config.get('calibrate_bn', False)})
++        if 'G_middle_0' in mapping_layers:
++            ret_acts['G_middle_0'] = x
+ 
+         if self.opt.num_upsampling_layers == 'more' or \
+-           self.opt.num_upsampling_layers == 'most':
++                self.opt.num_upsampling_layers == 'most':
+             x = self.up(x)
+ 
+-        x = self.G_middle_1(x, seg)
+-
++        channel = self.config['channels'][3]
++        x = self.G_middle_1(x, seg, {'channel': channel * 16, 'hidden': channel * 2,
++                                     'calibrate_bn': self.config.get('calibrate_bn', False)})
++        if 'G_middle_1' in mapping_layers:
++            ret_acts['G_middle_1'] = x
+         x = self.up(x)
+-        x = self.up_0(x, seg)
++        channel = self.config['channels'][4]
++        x = self.up_0(x, seg, {'channel': channel * 8, 'hidden': channel * 2,
++                               'calibrate_bn': self.config.get('calibrate_bn', False)})
++        if 'up_0' in mapping_layers:
++            ret_acts['up_0'] = x
+         x = self.up(x)
+-        x = self.up_1(x, seg)
++        channel = self.config['channels'][5]
++        x = self.up_1(x, seg, {'channel': channel * 4, 'hidden': channel * 2,
++                               'calibrate_bn': self.config.get('calibrate_bn', False)})
++        if 'up_1' in mapping_layers:
++            ret_acts['up_1'] = x
+         x = self.up(x)
+-        x = self.up_2(x, seg)
++        channel = self.config['channels'][6]
++        x = self.up_2(x, seg, {'channel': channel * 2, 'hidden': channel * 2,
++                               'calibrate_bn': self.config.get('calibrate_bn', False)})
++        if 'up_2' in mapping_layers:
++            ret_acts['up_2'] = x
+         x = self.up(x)
+-        x = self.up_3(x, seg)
+-
++        channel = self.config['channels'][7]
++        x = self.up_3(x, seg, {'channel': channel, 'hidden': channel * 2,
++                               'calibrate_bn': self.config.get('calibrate_bn', False)})
++        if 'up_3' in mapping_layers:
++            ret_acts['up_3'] = x
+         if self.opt.num_upsampling_layers == 'most':
+-            x = self.up(x)
+-            x = self.up_4(x, seg)
+-
+-        x = self.conv_img(F.leaky_relu(x, 2e-1))
++            raise NotImplementedError
++        x = self.conv_img(F.leaky_relu(x, 2e-1), {'channel': self.conv_img.out_channels})
+         x = F.tanh(x)
+ 
+-        return x
+-
+-
+-class Pix2PixHDGenerator(BaseNetwork):
+-    @staticmethod
+-    def modify_commandline_options(parser, is_train):
+-        parser.add_argument('--resnet_n_downsample', type=int, default=4, help='number of downsampling layers in netG')
+-        parser.add_argument('--resnet_n_blocks', type=int, default=9, help='number of residual blocks in the global generator network')
+-        parser.add_argument('--resnet_kernel_size', type=int, default=3,
+-                            help='kernel size of the resnet block')
+-        parser.add_argument('--resnet_initial_kernel_size', type=int, default=7,
+-                            help='kernel size of the first convolution')
+-        parser.set_defaults(norm_G='instance')
+-        return parser
+-
+-    def __init__(self, opt):
+-        super().__init__()
+-        input_nc = opt.label_nc + (1 if opt.contain_dontcare_label else 0) + (0 if opt.no_instance else 1)
+-
+-        norm_layer = get_nonspade_norm_layer(opt, opt.norm_G)
+-        activation = nn.ReLU(False)
+-
+-        model = []
+-
+-        # initial conv
+-        model += [nn.ReflectionPad2d(opt.resnet_initial_kernel_size // 2),
+-                  norm_layer(nn.Conv2d(input_nc, opt.ngf,
+-                                       kernel_size=opt.resnet_initial_kernel_size,
+-                                       padding=0)),
+-                  activation]
+-
+-        # downsample
+-        mult = 1
+-        for i in range(opt.resnet_n_downsample):
+-            model += [norm_layer(nn.Conv2d(opt.ngf * mult, opt.ngf * mult * 2,
+-                                           kernel_size=3, stride=2, padding=1)),
+-                      activation]
+-            mult *= 2
+-
+-        # resnet blocks
+-        for i in range(opt.resnet_n_blocks):
+-            model += [ResnetBlock(opt.ngf * mult,
+-                                  norm_layer=norm_layer,
+-                                  activation=activation,
+-                                  kernel_size=opt.resnet_kernel_size)]
+-
+-        # upsample
+-        for i in range(opt.resnet_n_downsample):
+-            nc_in = int(opt.ngf * mult)
+-            nc_out = int((opt.ngf * mult) / 2)
+-            model += [norm_layer(nn.ConvTranspose2d(nc_in, nc_out,
+-                                                    kernel_size=3, stride=2,
+-                                                    padding=1, output_padding=1)),
+-                      activation]
+-            mult = mult // 2
+-
+-        # final output conv
+-        model += [nn.ReflectionPad2d(3),
+-                  nn.Conv2d(nc_out, opt.output_nc, kernel_size=7, padding=0),
+-                  nn.Tanh()]
+-
+-        self.model = nn.Sequential(*model)
+-
+-    def forward(self, input, z=None):
+-        return self.model(input)
++        if len(mapping_layers) == 0:
++            return x
++        else:
++            return x, ret_acts
+Index: models/modules/spade_architecture/mobile_spade_generator.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/models/modules/spade_architecture/mobile_spade_generator.py b/models/modules/spade_architecture/mobile_spade_generator.py
+--- a/models/modules/spade_architecture/mobile_spade_generator.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/models/modules/spade_architecture/mobile_spade_generator.py	(date 1599021058000)
+@@ -1,56 +1,102 @@
+-"""
+-Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
+-Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+-"""
++import argparse
++
++from torch import nn
++from torch.nn import functional as F
++from torch.nn.utils import remove_spectral_norm
++from torch.nn.utils import spectral_norm
++
++from models.networks import BaseNetwork
++from .normalization import MobileSPADE
++
++
++class MobileSPADEResnetBlock(nn.Module):
++    def __init__(self, fin, fout, opt):
++        super(MobileSPADEResnetBlock, self).__init__()
++        # Attributes
++        self.learned_shortcut = (fin != fout)
++        fmiddle = min(fin, fout)
++
++        # create conv layers
++        self.conv_0 = nn.Conv2d(fin, fmiddle, kernel_size=3, padding=1)
++        self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=1)
++        if self.learned_shortcut:
++            self.conv_s = nn.Conv2d(fin, fout, kernel_size=1, bias=False)
++        if 'spectral' in opt.norm_G:
++            self.conv_0 = spectral_norm(self.conv_0)
++            self.conv_1 = spectral_norm(self.conv_1)
++            if self.learned_shortcut:
++                self.conv_s = spectral_norm(self.conv_s)
++        # apply spectral norm if specified
++
++        # define normalization layers
++        spade_config_str = opt.norm_G.replace('spectral', '')
++        self.norm_0 = MobileSPADE(spade_config_str, fin, opt.semantic_nc,
++                                  nhidden=opt.ngf * 2, separable_conv_norm=opt.separable_conv_norm)
++        self.norm_1 = MobileSPADE(spade_config_str, fmiddle, opt.semantic_nc,
++                                  nhidden=opt.ngf * 2, separable_conv_norm=opt.separable_conv_norm)
++        if self.learned_shortcut:
++            self.norm_s = MobileSPADE(spade_config_str, fin, opt.semantic_nc,
++                                      nhidden=opt.ngf * 2, separable_conv_norm=opt.separable_conv_norm)
++
++    # note the resnet block with SPADE also takes in |seg|,
++    # the semantic segmentation map as input
++    def forward(self, x, seg):
++        x_s = self.shortcut(x, seg)
++
++        dx = self.conv_0(self.actvn(self.norm_0(x, seg)))
++        dx = self.conv_1(self.actvn(self.norm_1(dx, seg)))
++
++        out = x_s + dx
++
++        return out
+ 
+-import torch
+-import torch.nn as nn
+-import torch.nn.functional as F
+-from models.networks.base_network import BaseNetwork
+-from models.networks.normalization import get_nonspade_norm_layer
+-from models.networks.architecture import ResnetBlock as ResnetBlock
+-from models.networks.architecture import SPADEResnetBlock as SPADEResnetBlock
++    def shortcut(self, x, seg):
++        if self.learned_shortcut:
++            x_s = self.conv_s(self.norm_s(x, seg))
++        else:
++            x_s = x
++        return x_s
+ 
++    def actvn(self, x):
++        return F.leaky_relu(x, 2e-1)
+ 
+-class SPADEGenerator(BaseNetwork):
++    def remove_spectral_norm(self):
++        self.conv_0 = remove_spectral_norm(self.conv_0)
++        self.conv_1 = remove_spectral_norm(self.conv_1)
++        if self.learned_shortcut:
++            self.conv_s = remove_spectral_norm(self.conv_s)
++
++
++class MobileSPADEGenerator(BaseNetwork):
+     @staticmethod
+     def modify_commandline_options(parser, is_train):
+-        parser.set_defaults(norm_G='spectralspadesyncbatch3x3')
+-        parser.add_argument('--num_upsampling_layers',
+-                            choices=('normal', 'more', 'most'), default='normal',
+-                            help="If 'more', adds upsampling layer between the two middle resnet blocks. If 'most', also add one more upsampling + resnet layer at the end of the generator")
+-
++        assert isinstance(parser, argparse.ArgumentParser)
+         return parser
+ 
+     def __init__(self, opt):
+-        super().__init__()
++        super(MobileSPADEGenerator, self).__init__()
+         self.opt = opt
+         nf = opt.ngf
+ 
+         self.sw, self.sh = self.compute_latent_vector_size(opt)
+ 
+-        if opt.use_vae:
+-            # In case of VAE, we will sample from random z vector
+-            self.fc = nn.Linear(opt.z_dim, 16 * nf * self.sw * self.sh)
+-        else:
+-            # Otherwise, we make the network deterministic by starting with
+-            # downsampled segmentation map instead of random z
+-            self.fc = nn.Conv2d(self.opt.semantic_nc, 16 * nf, 3, padding=1)
++        # downsampled segmentation map instead of random z
++        self.fc = nn.Conv2d(self.opt.semantic_nc, 16 * nf, 3, padding=1)
+ 
+-        self.head_0 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
++        self.head_0 = MobileSPADEResnetBlock(16 * nf, 16 * nf, opt)
+ 
+-        self.G_middle_0 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
+-        self.G_middle_1 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
++        self.G_middle_0 = MobileSPADEResnetBlock(16 * nf, 16 * nf, opt)
++        self.G_middle_1 = MobileSPADEResnetBlock(16 * nf, 16 * nf, opt)
+ 
+-        self.up_0 = SPADEResnetBlock(16 * nf, 8 * nf, opt)
+-        self.up_1 = SPADEResnetBlock(8 * nf, 4 * nf, opt)
+-        self.up_2 = SPADEResnetBlock(4 * nf, 2 * nf, opt)
+-        self.up_3 = SPADEResnetBlock(2 * nf, 1 * nf, opt)
++        self.up_0 = MobileSPADEResnetBlock(16 * nf, 8 * nf, opt)
++        self.up_1 = MobileSPADEResnetBlock(8 * nf, 4 * nf, opt)
++        self.up_2 = MobileSPADEResnetBlock(4 * nf, 2 * nf, opt)
++        self.up_3 = MobileSPADEResnetBlock(2 * nf, 1 * nf, opt)
+ 
+         final_nc = nf
+ 
+         if opt.num_upsampling_layers == 'most':
+-            self.up_4 = SPADEResnetBlock(1 * nf, nf // 2, opt)
++            self.up_4 = MobileSPADEResnetBlock(1 * nf, nf // 2, opt)
+             final_nc = nf // 2
+ 
+         self.conv_img = nn.Conv2d(final_nc, 3, 3, padding=1)
+@@ -68,115 +114,83 @@
+             raise ValueError('opt.num_upsampling_layers [%s] not recognized' %
+                              opt.num_upsampling_layers)
+ 
+-        sw = opt.crop_size // (2**num_up_layers)
++        sw = opt.crop_size // (2 ** num_up_layers)
+         sh = round(sw / opt.aspect_ratio)
+ 
+         return sw, sh
+ 
+-    def forward(self, input, z=None):
++    def forward(self, input, mapping_layers=[]):
+         seg = input
+ 
+-        if self.opt.use_vae:
+-            # we sample z from unit normal and reshape the tensor
+-            if z is None:
+-                z = torch.randn(input.size(0), self.opt.z_dim,
+-                                dtype=torch.float32, device=input.get_device())
+-            x = self.fc(z)
+-            x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
+-        else:
+-            # we downsample segmap and run convolution
+-            x = F.interpolate(seg, size=(self.sh, self.sw))
+-            x = self.fc(x)
++        ret_acts = {}
++
++        # we downsample segmap and run convolution
++        x = F.interpolate(seg, size=(self.sh, self.sw))
++        x = self.fc(x)
+ 
++        if 'fc' in mapping_layers:
++            ret_acts['fc'] = x
++
+         x = self.head_0(x, seg)
++        if 'head_0' in mapping_layers:
++            ret_acts['head_0'] = x
+ 
+         x = self.up(x)
+         x = self.G_middle_0(x, seg)
+ 
++        if 'G_middle_0' in mapping_layers:
++            ret_acts['G_middle_0'] = x
++
+         if self.opt.num_upsampling_layers == 'more' or \
+-           self.opt.num_upsampling_layers == 'most':
++                self.opt.num_upsampling_layers == 'most':
+             x = self.up(x)
+ 
+         x = self.G_middle_1(x, seg)
++        if 'G_middle_1' in mapping_layers:
++            ret_acts['G_middle_1'] = x
+ 
+         x = self.up(x)
+         x = self.up_0(x, seg)
++        if 'up_0' in mapping_layers:
++            ret_acts['up_0'] = x
++
+         x = self.up(x)
+         x = self.up_1(x, seg)
++        if 'up_1' in mapping_layers:
++            ret_acts['up_1'] = x
++
+         x = self.up(x)
+         x = self.up_2(x, seg)
++        if 'up_2' in mapping_layers:
++            ret_acts['up_2'] = x
++
+         x = self.up(x)
+         x = self.up_3(x, seg)
++        if 'up_3' in mapping_layers:
++            ret_acts['up_3'] = x
+ 
+         if self.opt.num_upsampling_layers == 'most':
+             x = self.up(x)
+             x = self.up_4(x, seg)
++            if 'up_4' in mapping_layers:
++                ret_acts['up_4'] = x
+ 
+         x = self.conv_img(F.leaky_relu(x, 2e-1))
+         x = F.tanh(x)
+-
+-        return x
+-
++        if len(mapping_layers) == 0:
++            return x
++        else:
++            return x, ret_acts
+ 
+-class Pix2PixHDGenerator(BaseNetwork):
+-    @staticmethod
+-    def modify_commandline_options(parser, is_train):
+-        parser.add_argument('--resnet_n_downsample', type=int, default=4, help='number of downsampling layers in netG')
+-        parser.add_argument('--resnet_n_blocks', type=int, default=9, help='number of residual blocks in the global generator network')
+-        parser.add_argument('--resnet_kernel_size', type=int, default=3,
+-                            help='kernel size of the resnet block')
+-        parser.add_argument('--resnet_initial_kernel_size', type=int, default=7,
+-                            help='kernel size of the first convolution')
+-        parser.set_defaults(norm_G='instance')
+-        return parser
++    def remove_spectral_norm(self):
++        self.head_0.remove_spectral_norm()
++        self.G_middle_0.remove_spectral_norm()
++        self.G_middle_1.remove_spectral_norm()
+ 
+-    def __init__(self, opt):
+-        super().__init__()
+-        input_nc = opt.label_nc + (1 if opt.contain_dontcare_label else 0) + (0 if opt.no_instance else 1)
++        self.up_0.remove_spectral_norm()
++        self.up_1.remove_spectral_norm()
++        self.up_2.remove_spectral_norm()
++        self.up_3.remove_spectral_norm()
+ 
+-        norm_layer = get_nonspade_norm_layer(opt, opt.norm_G)
+-        activation = nn.ReLU(False)
+-
+-        model = []
+-
+-        # initial conv
+-        model += [nn.ReflectionPad2d(opt.resnet_initial_kernel_size // 2),
+-                  norm_layer(nn.Conv2d(input_nc, opt.ngf,
+-                                       kernel_size=opt.resnet_initial_kernel_size,
+-                                       padding=0)),
+-                  activation]
+-
+-        # downsample
+-        mult = 1
+-        for i in range(opt.resnet_n_downsample):
+-            model += [norm_layer(nn.Conv2d(opt.ngf * mult, opt.ngf * mult * 2,
+-                                           kernel_size=3, stride=2, padding=1)),
+-                      activation]
+-            mult *= 2
+-
+-        # resnet blocks
+-        for i in range(opt.resnet_n_blocks):
+-            model += [ResnetBlock(opt.ngf * mult,
+-                                  norm_layer=norm_layer,
+-                                  activation=activation,
+-                                  kernel_size=opt.resnet_kernel_size)]
+-
+-        # upsample
+-        for i in range(opt.resnet_n_downsample):
+-            nc_in = int(opt.ngf * mult)
+-            nc_out = int((opt.ngf * mult) / 2)
+-            model += [norm_layer(nn.ConvTranspose2d(nc_in, nc_out,
+-                                                    kernel_size=3, stride=2,
+-                                                    padding=1, output_padding=1)),
+-                      activation]
+-            mult = mult // 2
+-
+-        # final output conv
+-        model += [nn.ReflectionPad2d(3),
+-                  nn.Conv2d(nc_out, opt.output_nc, kernel_size=7, padding=0),
+-                  nn.Tanh()]
+-
+-        self.model = nn.Sequential(*model)
+-
+-    def forward(self, input, z=None):
+-        return self.model(input)
++        if self.opt.num_upsampling_layers == 'most':
++            self.up_4.remove_spectral_norm()
+Index: datasets/coco_generate_instance_map.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/datasets/coco_generate_instance_map.py b/datasets/coco_generate_instance_map.py
+--- a/datasets/coco_generate_instance_map.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/datasets/coco_generate_instance_map.py	(date 1594993608000)
+@@ -3,11 +3,13 @@
+ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+ """
+ 
+-import os
+ import argparse
+-from pycocotools.coco import COCO
++import os
++
+ import numpy as np
+ import skimage.io as io
++import tqdm
++from pycocotools.coco import COCO
+ from skimage.draw import polygon
+ 
+ parser = argparse.ArgumentParser()
+@@ -17,8 +19,8 @@
+                     help="Path to the directory containing label maps. It can be downloaded at http://calvin.inf.ed.ac.uk/wp-content/uploads/data/cocostuffdataset/stuffthingmaps_trainval2017.zip")
+ parser.add_argument('--output_instance_dir', type=str, default="./train_inst/",
+                     help="Path to the output directory of instance maps")
+-
+ opt = parser.parse_args()
++os.makedirs(opt.output_instance_dir, exist_ok=True)
+ 
+ print("annotation file at {}".format(opt.annotation_file))
+ print("input label maps at {}".format(opt.input_label_dir))
+@@ -27,18 +29,17 @@
+ # initialize COCO api for instance annotations
+ coco = COCO(opt.annotation_file)
+ 
+-
+ # display COCO categories and supercategories
+ cats = coco.loadCats(coco.getCatIds())
+ imgIds = coco.getImgIds(catIds=coco.getCatIds(cats))
+-for ix, id in enumerate(imgIds):
+-    if ix % 50 == 0:
+-        print("{} / {}".format(ix, len(imgIds)))
++for ix, id in enumerate(tqdm.tqdm(imgIds)):
++    # if ix % 50 == 0:
++    #     print("{} / {}".format(ix, len(imgIds)))
+     img_dict = coco.loadImgs(id)[0]
+     filename = img_dict["file_name"].replace("jpg", "png")
+     label_name = os.path.join(opt.input_label_dir, filename)
+     inst_name = os.path.join(opt.output_instance_dir, filename)
+-    img = io.imread(label_name, as_grey=True)
++    img = io.imread(label_name, as_gray=True)
+ 
+     annIds = coco.getAnnIds(imgIds=id, catIds=[], iscrowd=None)
+     anns = coco.loadAnns(annIds)
+Index: data/cityscapes_dataset.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/data/cityscapes_dataset.py b/data/cityscapes_dataset.py
+--- a/data/cityscapes_dataset.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/data/cityscapes_dataset.py	(date 1600232895000)
+@@ -3,31 +3,30 @@
+ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+ """
+ 
++import argparse
+ import os.path
+-from data.pix2pix_dataset import Pix2pixDataset
++
+ from data.image_folder import make_dataset
++from data.spade_dataset import SPADEDataset
+ 
+ 
+-class CityscapesDataset(Pix2pixDataset):
++class CityscapesDataset(SPADEDataset):
++
++    def __init__(self, opt):
++        super(CityscapesDataset, self).__init__(opt)
+ 
+     @staticmethod
+     def modify_commandline_options(parser, is_train):
+-        parser = Pix2pixDataset.modify_commandline_options(parser, is_train)
+-        parser.set_defaults(preprocess_mode='fixed')
+-        parser.set_defaults(load_size=512)
+-        parser.set_defaults(crop_size=512)
+-        parser.set_defaults(display_winsize=512)
+-        parser.set_defaults(label_nc=35)
+-        parser.set_defaults(aspect_ratio=2.0)
+-        parser.set_defaults(batchSize=16)
+-        opt, _ = parser.parse_known_args()
+-        if hasattr(opt, 'num_upsampling_layers'):
+-            parser.set_defaults(num_upsampling_layers='more')
++        parser = SPADEDataset.modify_commandline_options(parser, is_train)
++        assert isinstance(parser, argparse.ArgumentParser)
++        parser.set_defaults(preprocess='scale_width', aspect_ratio=2,
++                            load_size=512, crop_size=512, direction='BtoA',
++                            display_winsize=512, input_nc=35, num_threads=0)
+         return parser
+ 
+     def get_paths(self, opt):
+         root = opt.dataroot
+-        phase = 'val' if opt.phase == 'test' else 'train'
++        phase = opt.phase
+ 
+         label_dir = os.path.join(root, 'gtFine', phase)
+         label_paths_all = make_dataset(label_dir, recursive=True)
+@@ -47,5 +46,4 @@
+         name1 = os.path.basename(path1)
+         name2 = os.path.basename(path2)
+         # compare the first 3 components, [city]_[id1]_[id2]
+-        return '_'.join(name1.split('_')[:3]) == \
+-            '_'.join(name2.split('_')[:3])
++        return '_'.join(name1.split('_')[:3]) == '_'.join(name2.split('_')[:3])
+Index: models/modules/spade_architecture/sub_mobile_spade_generator.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/models/modules/spade_architecture/sub_mobile_spade_generator.py b/models/modules/spade_architecture/sub_mobile_spade_generator.py
+--- a/models/modules/spade_architecture/sub_mobile_spade_generator.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/models/modules/spade_architecture/sub_mobile_spade_generator.py	(date 1593757063000)
+@@ -1,58 +1,124 @@
+-"""
+-Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
+-Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+-"""
++from torch import nn
++from torch.nn import functional as F
++
++from models.networks import BaseNetwork
++from .normalization import SubMobileSPADE
++
++
++class SubMobileSPADEResnetBlock(nn.Module):
++    def __init__(self, fin, fout, ic, opt, config):
++        super(SubMobileSPADEResnetBlock, self).__init__()
++        # Attributes
++        self.learned_shortcut = (fin != fout)
++        self.ic = ic
++        self.config = config
++        channel, hidden = config['channel'], config['hidden']
+ 
+-import torch
+-import torch.nn as nn
+-import torch.nn.functional as F
+-from models.networks.base_network import BaseNetwork
+-from models.networks.normalization import get_nonspade_norm_layer
+-from models.networks.architecture import ResnetBlock as ResnetBlock
+-from models.networks.architecture import SPADEResnetBlock as SPADEResnetBlock
++        fmiddle = min(fin, fout)
+ 
++        # create conv layers
++        self.conv_0 = nn.Conv2d(ic, channel, kernel_size=3, padding=1)
++        if self.learned_shortcut:
++            self.conv_1 = nn.Conv2d(channel, channel, kernel_size=3, padding=1)
++        else:
++            self.conv_1 = nn.Conv2d(channel, ic, kernel_size=3, padding=1)
+ 
+-class SPADEGenerator(BaseNetwork):
++        if self.learned_shortcut:
++            self.conv_s = nn.Conv2d(ic, channel, kernel_size=1, bias=False)
++
++        # apply spectral norm if specified
++
++        # define normalization layers
++        spade_config_str = opt.norm_G
++        self.norm_0 = SubMobileSPADE(spade_config_str, fin, opt.semantic_nc,
++                                     nhidden=hidden, oc=ic)
++        self.norm_1 = SubMobileSPADE(spade_config_str, fmiddle, opt.semantic_nc,
++                                     nhidden=hidden, oc=channel)
++        if self.learned_shortcut:
++            self.norm_s = SubMobileSPADE(spade_config_str, fin, opt.semantic_nc,
++                                         nhidden=hidden, oc=ic)
++
++    # note the resnet block with SPADE also takes in |seg|,
++    # the semantic segmentation map as input
++    def forward(self, x, seg):
++        x_s = self.shortcut(x, seg)
++
++        dx = self.conv_0(self.actvn(self.norm_0(x, seg)))
++        dx = self.conv_1(self.actvn(self.norm_1(dx, seg)))
++
++        out = x_s + dx
++
++        return out
++
++    def shortcut(self, x, seg):
++        if self.learned_shortcut:
++            x_s = self.conv_s(self.norm_s(x, seg))
++        else:
++            x_s = x
++        return x_s
++
++    def actvn(self, x):
++        return F.leaky_relu(x, 2e-1)
++
++
++class SubMobileSPADEGenerator(BaseNetwork):
+     @staticmethod
+     def modify_commandline_options(parser, is_train):
+-        parser.set_defaults(norm_G='spectralspadesyncbatch3x3')
+-        parser.add_argument('--num_upsampling_layers',
+-                            choices=('normal', 'more', 'most'), default='normal',
+-                            help="If 'more', adds upsampling layer between the two middle resnet blocks. If 'most', also add one more upsampling + resnet layer at the end of the generator")
+-
+         return parser
+ 
+-    def __init__(self, opt):
+-        super().__init__()
++    def __init__(self, opt, config):
++        super(SubMobileSPADEGenerator, self).__init__()
+         self.opt = opt
++        self.config = config
+         nf = opt.ngf
+ 
+         self.sw, self.sh = self.compute_latent_vector_size(opt)
+ 
+-        if opt.use_vae:
+-            # In case of VAE, we will sample from random z vector
+-            self.fc = nn.Linear(opt.z_dim, 16 * nf * self.sw * self.sh)
+-        else:
+-            # Otherwise, we make the network deterministic by starting with
+-            # downsampled segmentation map instead of random z
+-            self.fc = nn.Conv2d(self.opt.semantic_nc, 16 * nf, 3, padding=1)
++        # downsampled segmentation map instead of random z
++        channel = config['channels'][0]
++        self.fc = nn.Conv2d(self.opt.semantic_nc, 16 * channel, 3, padding=1)
++
++        ic = channel * 16
++        channel = config['channels'][1]
++        self.head_0 = SubMobileSPADEResnetBlock(16 * nf, 16 * nf, ic, opt,
++                                                {'channel': channel * 16,
++                                                 'hidden': channel * 2})
+ 
+-        self.head_0 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
++        channel = config['channels'][2]
++        self.G_middle_0 = SubMobileSPADEResnetBlock(16 * nf, 16 * nf, ic, opt,
++                                                    {'channel': channel * 16,
++                                                     'hidden': channel * 2})
+ 
+-        self.G_middle_0 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
+-        self.G_middle_1 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
++        channel = config['channels'][3]
++        self.G_middle_1 = SubMobileSPADEResnetBlock(16 * nf, 16 * nf, ic, opt,
++                                                    {'channel': channel * 16,
++                                                     'hidden': channel * 2})
+ 
+-        self.up_0 = SPADEResnetBlock(16 * nf, 8 * nf, opt)
+-        self.up_1 = SPADEResnetBlock(8 * nf, 4 * nf, opt)
+-        self.up_2 = SPADEResnetBlock(4 * nf, 2 * nf, opt)
+-        self.up_3 = SPADEResnetBlock(2 * nf, 1 * nf, opt)
++        channel = config['channels'][4]
++        self.up_0 = SubMobileSPADEResnetBlock(16 * nf, 8 * nf, ic, opt,
++                                              {'channel': channel * 8,
++                                               'hidden': channel * 2})
+ 
+-        final_nc = nf
++        ic = channel * 8
++        channel = config['channels'][5]
++        self.up_1 = SubMobileSPADEResnetBlock(8 * nf, 4 * nf, ic, opt,
++                                              {'channel': channel * 4,
++                                               'hidden': channel * 2})
++        ic = channel * 4
++        channel = config['channels'][6]
++        self.up_2 = SubMobileSPADEResnetBlock(4 * nf, 2 * nf, ic, opt,
++                                              {'channel': channel * 2,
++                                               'hidden': channel * 2})
++        ic = channel * 2
++        channel = config['channels'][7]
++        self.up_3 = SubMobileSPADEResnetBlock(2 * nf, 1 * nf, ic, opt,
++                                              {'channel': channel,
++                                               'hidden': channel * 2})
++
++        final_nc = channel
+ 
+         if opt.num_upsampling_layers == 'most':
+-            self.up_4 = SPADEResnetBlock(1 * nf, nf // 2, opt)
+-            final_nc = nf // 2
+-
++            raise NotImplementedError
+         self.conv_img = nn.Conv2d(final_nc, 3, 3, padding=1)
+ 
+         self.up = nn.Upsample(scale_factor=2)
+@@ -68,7 +134,7 @@
+             raise ValueError('opt.num_upsampling_layers [%s] not recognized' %
+                              opt.num_upsampling_layers)
+ 
+-        sw = opt.crop_size // (2**num_up_layers)
++        sw = opt.crop_size // (2 ** num_up_layers)
+         sh = round(sw / opt.aspect_ratio)
+ 
+         return sw, sh
+@@ -76,17 +142,9 @@
+     def forward(self, input, z=None):
+         seg = input
+ 
+-        if self.opt.use_vae:
+-            # we sample z from unit normal and reshape the tensor
+-            if z is None:
+-                z = torch.randn(input.size(0), self.opt.z_dim,
+-                                dtype=torch.float32, device=input.get_device())
+-            x = self.fc(z)
+-            x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
+-        else:
+-            # we downsample segmap and run convolution
+-            x = F.interpolate(seg, size=(self.sh, self.sw))
+-            x = self.fc(x)
++        # we downsample segmap and run convolution
++        x = F.interpolate(seg, size=(self.sh, self.sw))
++        x = self.fc(x)
+ 
+         x = self.head_0(x, seg)
+ 
+@@ -94,7 +152,7 @@
+         x = self.G_middle_0(x, seg)
+ 
+         if self.opt.num_upsampling_layers == 'more' or \
+-           self.opt.num_upsampling_layers == 'most':
++                self.opt.num_upsampling_layers == 'most':
+             x = self.up(x)
+ 
+         x = self.G_middle_1(x, seg)
+@@ -116,67 +174,3 @@
+         x = F.tanh(x)
+ 
+         return x
+-
+-
+-class Pix2PixHDGenerator(BaseNetwork):
+-    @staticmethod
+-    def modify_commandline_options(parser, is_train):
+-        parser.add_argument('--resnet_n_downsample', type=int, default=4, help='number of downsampling layers in netG')
+-        parser.add_argument('--resnet_n_blocks', type=int, default=9, help='number of residual blocks in the global generator network')
+-        parser.add_argument('--resnet_kernel_size', type=int, default=3,
+-                            help='kernel size of the resnet block')
+-        parser.add_argument('--resnet_initial_kernel_size', type=int, default=7,
+-                            help='kernel size of the first convolution')
+-        parser.set_defaults(norm_G='instance')
+-        return parser
+-
+-    def __init__(self, opt):
+-        super().__init__()
+-        input_nc = opt.label_nc + (1 if opt.contain_dontcare_label else 0) + (0 if opt.no_instance else 1)
+-
+-        norm_layer = get_nonspade_norm_layer(opt, opt.norm_G)
+-        activation = nn.ReLU(False)
+-
+-        model = []
+-
+-        # initial conv
+-        model += [nn.ReflectionPad2d(opt.resnet_initial_kernel_size // 2),
+-                  norm_layer(nn.Conv2d(input_nc, opt.ngf,
+-                                       kernel_size=opt.resnet_initial_kernel_size,
+-                                       padding=0)),
+-                  activation]
+-
+-        # downsample
+-        mult = 1
+-        for i in range(opt.resnet_n_downsample):
+-            model += [norm_layer(nn.Conv2d(opt.ngf * mult, opt.ngf * mult * 2,
+-                                           kernel_size=3, stride=2, padding=1)),
+-                      activation]
+-            mult *= 2
+-
+-        # resnet blocks
+-        for i in range(opt.resnet_n_blocks):
+-            model += [ResnetBlock(opt.ngf * mult,
+-                                  norm_layer=norm_layer,
+-                                  activation=activation,
+-                                  kernel_size=opt.resnet_kernel_size)]
+-
+-        # upsample
+-        for i in range(opt.resnet_n_downsample):
+-            nc_in = int(opt.ngf * mult)
+-            nc_out = int((opt.ngf * mult) / 2)
+-            model += [norm_layer(nn.ConvTranspose2d(nc_in, nc_out,
+-                                                    kernel_size=3, stride=2,
+-                                                    padding=1, output_padding=1)),
+-                      activation]
+-            mult = mult // 2
+-
+-        # final output conv
+-        model += [nn.ReflectionPad2d(3),
+-                  nn.Conv2d(nc_out, opt.output_nc, kernel_size=7, padding=0),
+-                  nn.Tanh()]
+-
+-        self.model = nn.Sequential(*model)
+-
+-    def forward(self, input, z=None):
+-        return self.model(input)
+Index: data/coco_dataset.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/data/coco_dataset.py b/data/coco_dataset.py
+--- a/data/coco_dataset.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/data/coco_dataset.py	(date 1609771048000)
+@@ -3,16 +3,22 @@
+ Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+ """
+ 
++import argparse
+ import os.path
+-from data.pix2pix_dataset import Pix2pixDataset
++
+ from data.image_folder import make_dataset
++from data.spade_dataset import SPADEDataset
+ 
+ 
+-class CocoDataset(Pix2pixDataset):
++class CocoDataset(SPADEDataset):
++
++    def __init__(self, opt):
++        super(CocoDataset, self).__init__(opt)
+ 
+     @staticmethod
+     def modify_commandline_options(parser, is_train):
+-        parser = Pix2pixDataset.modify_commandline_options(parser, is_train)
++        parser = SPADEDataset.modify_commandline_options(parser, is_train)
++        assert isinstance(parser, argparse.ArgumentParser)
+         parser.add_argument('--coco_no_portraits', action='store_true')
+         parser.set_defaults(preprocess_mode='resize_and_crop')
+         if is_train:
+@@ -20,46 +26,51 @@
+         else:
+             parser.set_defaults(load_size=256)
+         parser.set_defaults(crop_size=256)
+-        parser.set_defaults(display_winsize=256)
+-        parser.set_defaults(label_nc=182)
++        parser.set_defaults(input_nc=182)
+         parser.set_defaults(contain_dontcare_label=True)
+-        parser.set_defaults(cache_filelist_read=True)
+-        parser.set_defaults(cache_filelist_write=True)
++        parser.set_defaults(direction='BtoA')
+         return parser
+ 
+     def get_paths(self, opt):
+         root = opt.dataroot
+-        phase = 'val' if opt.phase == 'test' else opt.phase
++        phase = opt.phase
+ 
+         label_dir = os.path.join(root, '%s_label' % phase)
+-        label_paths = make_dataset(label_dir, recursive=False, read_cache=True)
++        label_paths = make_dataset(label_dir, recursive=False)
+ 
+         if not opt.coco_no_portraits and opt.isTrain:
+             label_portrait_dir = os.path.join(root, '%s_label_portrait' % phase)
+             if os.path.isdir(label_portrait_dir):
+-                label_portrait_paths = make_dataset(label_portrait_dir, recursive=False, read_cache=True)
++                label_portrait_paths = make_dataset(label_portrait_dir, recursive=False)
+                 label_paths += label_portrait_paths
+ 
+         image_dir = os.path.join(root, '%s_img' % phase)
+-        image_paths = make_dataset(image_dir, recursive=False, read_cache=True)
++        image_paths = make_dataset(image_dir, recursive=False)
+ 
+         if not opt.coco_no_portraits and opt.isTrain:
+             image_portrait_dir = os.path.join(root, '%s_img_portrait' % phase)
+             if os.path.isdir(image_portrait_dir):
+-                image_portrait_paths = make_dataset(image_portrait_dir, recursive=False, read_cache=True)
++                image_portrait_paths = make_dataset(image_portrait_dir, recursive=False)
+                 image_paths += image_portrait_paths
+ 
+         if not opt.no_instance:
+             instance_dir = os.path.join(root, '%s_inst' % phase)
+-            instance_paths = make_dataset(instance_dir, recursive=False, read_cache=True)
++            instance_paths = make_dataset(instance_dir, recursive=False)
+ 
+             if not opt.coco_no_portraits and opt.isTrain:
+                 instance_portrait_dir = os.path.join(root, '%s_inst_portrait' % phase)
+                 if os.path.isdir(instance_portrait_dir):
+-                    instance_portrait_paths = make_dataset(instance_portrait_dir, recursive=False, read_cache=True)
++                    instance_portrait_paths = make_dataset(instance_portrait_dir, recursive=False)
+                     instance_paths += instance_portrait_paths
+ 
+         else:
+             instance_paths = []
+ 
+         return label_paths, image_paths, instance_paths
++
++    def paths_match(self, path1, path2):
++        name1 = os.path.basename(path1)
++        name2 = os.path.basename(path2)
++        filename1 = os.path.splitext(name1)[0]
++        filename2 = os.path.splitext(name2)[0]
++        return filename1 == filename2
+Index: models/modules/spade_architecture/spade_generator.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/models/modules/spade_architecture/spade_generator.py b/models/modules/spade_architecture/spade_generator.py
+--- a/models/modules/spade_architecture/spade_generator.py	(revision 20255f9170dbf2073658043c533dd8d31cc7d2aa)
++++ b/models/modules/spade_architecture/spade_generator.py	(date 1600079843000)
+@@ -1,41 +1,79 @@
+-"""
+-Copyright (C) 2019 NVIDIA Corporation.  All rights reserved.
+-Licensed under the CC BY-NC-SA 4.0 license (https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+-"""
++from torch import nn
++from torch.nn import functional as F
++from torch.nn.utils import remove_spectral_norm
++from torch.nn.utils import spectral_norm
++
++from models.modules.spade_architecture.normalization import SPADE
++from models.networks import BaseNetwork
++
++
++class SPADEResnetBlock(nn.Module):
++    def __init__(self, fin, fout, opt):
++        super().__init__()
++        # Attributes
++        self.learned_shortcut = (fin != fout)
++        fmiddle = min(fin, fout)
++
++        # create conv layers
++        self.conv_0 = nn.Conv2d(fin, fmiddle, kernel_size=3, padding=1)
++        self.conv_1 = nn.Conv2d(fmiddle, fout, kernel_size=3, padding=1)
++        if self.learned_shortcut:
++            self.conv_s = nn.Conv2d(fin, fout, kernel_size=1, bias=False)
++        if 'spectral' in opt.norm_G:
++            self.conv_0 = spectral_norm(self.conv_0)
++            self.conv_1 = spectral_norm(self.conv_1)
++            if self.learned_shortcut:
++                self.conv_s = spectral_norm(self.conv_s)
+ 
+-import torch
+-import torch.nn as nn
+-import torch.nn.functional as F
+-from models.networks.base_network import BaseNetwork
+-from models.networks.normalization import get_nonspade_norm_layer
+-from models.networks.architecture import ResnetBlock as ResnetBlock
+-from models.networks.architecture import SPADEResnetBlock as SPADEResnetBlock
++        # define normalization layers
++        spade_config_str = opt.norm_G.replace('spectral', '')
++        self.norm_0 = SPADE(spade_config_str, fin, opt.semantic_nc, nhidden=opt.ngf * 2)
++        self.norm_1 = SPADE(spade_config_str, fmiddle, opt.semantic_nc, nhidden=opt.ngf * 2)
++        if self.learned_shortcut:
++            self.norm_s = SPADE(spade_config_str, fin, opt.semantic_nc, nhidden=opt.ngf * 2)
++
++    # note the resnet block with SPADE also takes in |seg|,
++    # the semantic segmentation map as input
++    def forward(self, x, seg):
++        x_s = self.shortcut(x, seg)
++
++        dx = self.conv_0(self.actvn(self.norm_0(x, seg)))
++        dx = self.conv_1(self.actvn(self.norm_1(dx, seg)))
++
++        out = x_s + dx
++
++        return out
++
++    def shortcut(self, x, seg):
++        if self.learned_shortcut:
++            x_s = self.conv_s(self.norm_s(x, seg))
++        else:
++            x_s = x
++        return x_s
++
++    def actvn(self, x):
++        return F.leaky_relu(x, 2e-1)
++
++    def remove_spectral_norm(self):
++        self.conv_0 = remove_spectral_norm(self.conv_0)
++        self.conv_1 = remove_spectral_norm(self.conv_1)
++        if self.learned_shortcut:
++            self.conv_s = remove_spectral_norm(self.conv_s)
+ 
+ 
+ class SPADEGenerator(BaseNetwork):
+     @staticmethod
+     def modify_commandline_options(parser, is_train):
+-        parser.set_defaults(norm_G='spectralspadesyncbatch3x3')
+-        parser.add_argument('--num_upsampling_layers',
+-                            choices=('normal', 'more', 'most'), default='normal',
+-                            help="If 'more', adds upsampling layer between the two middle resnet blocks. If 'most', also add one more upsampling + resnet layer at the end of the generator")
+-
+         return parser
+ 
+     def __init__(self, opt):
+-        super().__init__()
++        super(SPADEGenerator, self).__init__()
+         self.opt = opt
+         nf = opt.ngf
+ 
+         self.sw, self.sh = self.compute_latent_vector_size(opt)
+ 
+-        if opt.use_vae:
+-            # In case of VAE, we will sample from random z vector
+-            self.fc = nn.Linear(opt.z_dim, 16 * nf * self.sw * self.sh)
+-        else:
+-            # Otherwise, we make the network deterministic by starting with
+-            # downsampled segmentation map instead of random z
+-            self.fc = nn.Conv2d(self.opt.semantic_nc, 16 * nf, 3, padding=1)
++        self.fc = nn.Conv2d(self.opt.semantic_nc, 16 * nf, 3, padding=1)
+ 
+         self.head_0 = SPADEResnetBlock(16 * nf, 16 * nf, opt)
+ 
+@@ -68,115 +106,73 @@
+             raise ValueError('opt.num_upsampling_layers [%s] not recognized' %
+                              opt.num_upsampling_layers)
+ 
+-        sw = opt.crop_size // (2**num_up_layers)
++        sw = opt.crop_size // (2 ** num_up_layers)
+         sh = round(sw / opt.aspect_ratio)
+ 
+         return sw, sh
+ 
+-    def forward(self, input, z=None):
++    def forward(self, input, mapping_layers=[]):
+         seg = input
++        ret_acts = {}
+ 
+-        if self.opt.use_vae:
+-            # we sample z from unit normal and reshape the tensor
+-            if z is None:
+-                z = torch.randn(input.size(0), self.opt.z_dim,
+-                                dtype=torch.float32, device=input.get_device())
+-            x = self.fc(z)
+-            x = x.view(-1, 16 * self.opt.ngf, self.sh, self.sw)
+-        else:
+-            # we downsample segmap and run convolution
+-            x = F.interpolate(seg, size=(self.sh, self.sw))
+-            x = self.fc(x)
+-
++        # we downsample segmap and run convolution
++        x = F.interpolate(seg, size=(self.sh, self.sw))
++        x = self.fc(x)
++        if 'fc' in mapping_layers:
++            ret_acts['fc'] = x
+         x = self.head_0(x, seg)
+-
++        if 'head_0' in mapping_layers:
++            ret_acts['head_0'] = x
+         x = self.up(x)
+         x = self.G_middle_0(x, seg)
+-
++        if 'G_middle_0' in mapping_layers:
++            ret_acts['G_middle_0'] = x
+         if self.opt.num_upsampling_layers == 'more' or \
+-           self.opt.num_upsampling_layers == 'most':
++                self.opt.num_upsampling_layers == 'most':
+             x = self.up(x)
+ 
+         x = self.G_middle_1(x, seg)
+-
++        if 'G_middle_1' in mapping_layers:
++            ret_acts['G_middle_1'] = x
+         x = self.up(x)
+         x = self.up_0(x, seg)
++        if 'up_0' in mapping_layers:
++            ret_acts['up_0'] = x
+         x = self.up(x)
+         x = self.up_1(x, seg)
++        if 'up_1' in mapping_layers:
++            ret_acts['up_1'] = x
+         x = self.up(x)
+         x = self.up_2(x, seg)
++        if 'up_2' in mapping_layers:
++            ret_acts['up_2'] = x
+         x = self.up(x)
+         x = self.up_3(x, seg)
+-
++        if 'up_3' in mapping_layers:
++            ret_acts['up_3'] = x
+         if self.opt.num_upsampling_layers == 'most':
+             x = self.up(x)
+             x = self.up_4(x, seg)
++            if 'up_4' in mapping_layers:
++                ret_acts['up_4'] = x
+ 
+         x = self.conv_img(F.leaky_relu(x, 2e-1))
+         x = F.tanh(x)
+ 
+-        return x
+-
++        if len(mapping_layers) == 0:
++            return x
++        else:
++            return x, ret_acts
+ 
+-class Pix2PixHDGenerator(BaseNetwork):
+-    @staticmethod
+-    def modify_commandline_options(parser, is_train):
+-        parser.add_argument('--resnet_n_downsample', type=int, default=4, help='number of downsampling layers in netG')
+-        parser.add_argument('--resnet_n_blocks', type=int, default=9, help='number of residual blocks in the global generator network')
+-        parser.add_argument('--resnet_kernel_size', type=int, default=3,
+-                            help='kernel size of the resnet block')
+-        parser.add_argument('--resnet_initial_kernel_size', type=int, default=7,
+-                            help='kernel size of the first convolution')
+-        parser.set_defaults(norm_G='instance')
+-        return parser
++    def remove_spectral_norm(self):
++        self.head_0.remove_spectral_norm()
++        self.G_middle_0.remove_spectral_norm()
++        self.G_middle_1.remove_spectral_norm()
+ 
+-    def __init__(self, opt):
+-        super().__init__()
+-        input_nc = opt.label_nc + (1 if opt.contain_dontcare_label else 0) + (0 if opt.no_instance else 1)
++        self.up_0.remove_spectral_norm()
++        self.up_1.remove_spectral_norm()
++        self.up_2.remove_spectral_norm()
++        self.up_3.remove_spectral_norm()
+ 
+-        norm_layer = get_nonspade_norm_layer(opt, opt.norm_G)
+-        activation = nn.ReLU(False)
+-
+-        model = []
+-
+-        # initial conv
+-        model += [nn.ReflectionPad2d(opt.resnet_initial_kernel_size // 2),
+-                  norm_layer(nn.Conv2d(input_nc, opt.ngf,
+-                                       kernel_size=opt.resnet_initial_kernel_size,
+-                                       padding=0)),
+-                  activation]
+-
+-        # downsample
+-        mult = 1
+-        for i in range(opt.resnet_n_downsample):
+-            model += [norm_layer(nn.Conv2d(opt.ngf * mult, opt.ngf * mult * 2,
+-                                           kernel_size=3, stride=2, padding=1)),
+-                      activation]
+-            mult *= 2
+-
+-        # resnet blocks
+-        for i in range(opt.resnet_n_blocks):
+-            model += [ResnetBlock(opt.ngf * mult,
+-                                  norm_layer=norm_layer,
+-                                  activation=activation,
+-                                  kernel_size=opt.resnet_kernel_size)]
+-
+-        # upsample
+-        for i in range(opt.resnet_n_downsample):
+-            nc_in = int(opt.ngf * mult)
+-            nc_out = int((opt.ngf * mult) / 2)
+-            model += [norm_layer(nn.ConvTranspose2d(nc_in, nc_out,
+-                                                    kernel_size=3, stride=2,
+-                                                    padding=1, output_padding=1)),
+-                      activation]
+-            mult = mult // 2
+-
+-        # final output conv
+-        model += [nn.ReflectionPad2d(3),
+-                  nn.Conv2d(nc_out, opt.output_nc, kernel_size=7, padding=0),
+-                  nn.Tanh()]
+-
+-        self.model = nn.Sequential(*model)
+-
+-    def forward(self, input, z=None):
+-        return self.model(input)
++        if self.opt.num_upsampling_layers == 'most':
++            self.up_4.remove_spectral_norm()
