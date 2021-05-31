@@ -362,8 +362,8 @@ Here we show the performance of all our released models:
   </tr>
   <tr>
     <td>Fast GAN Compression</td>
-    <td>0.756M</td>
-    <td>4.61G</td>
+    <td>0.703M</td>
+    <td>4.83G</td>
     <td>25.76</td>
     <td>--</td>
   </tr>
