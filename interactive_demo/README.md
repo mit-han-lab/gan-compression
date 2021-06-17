@@ -9,6 +9,7 @@
 We show how to deploy our compressed Pix2pix model on **NVIDIA Jetson Nano**. Our model is compiled with **TVM Auto Scheduler** [1,2] for acceleration. The final model achieves about **8** FPS on Jetson Nano GPU.
 
 [1] Tianqi Chen *et al.*, *TVM: An automated end-to-end optimizing compiler for deep learning*, in OSDI 2018
+
 [2] Lianmin Zheng *et al.*, *Ansor: Generating High-Performance Tensor Programs for Deep Learning.*, in OSDI 2020
 
 ## Getting Started
