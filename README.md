@@ -1,6 +1,8 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [videos](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex) | [slides](https://hanlab.mit.edu/projects/gancompression/resources/546-slides.pdf) 
 
+**[NEW!]** We release the codes of our [interactive demo](interactive_demo) and include the [TVM](https://github.com/apache/tvm) tuned model. It achieves **8FPS** on Jetson Nano GPU now!
+
 **[NEW!]** Add support to the [MUNIT](https://github.com/NVlabs/MUNIT), a multimodal unsupervised image-to-image translation approach! Please follow the [test commands](#munit) to test the pre-trained models and the [tutorial](docs/tutorials/fast_gan_compression.md) to train your own models!
 
 **[NEW!]** The [arXiv v3](https://arxiv.org/abs/2003.08936) is released! We introduce an improved pipeline, [Fast GAN Compression](docs/tutorials/fast_gan_compression.md), which could produce comparable results as GAN Compression with much simpler procedures!
