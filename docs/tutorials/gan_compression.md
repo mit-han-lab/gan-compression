@@ -46,13 +46,7 @@ bash scripts/pix2pix/edges2shoes-r/test_mobile.sh
 bash scripts/pix2pix/edges2shoes-r/distill.sh
 ```
 
-We provide a pre-distilled teacher for each dataset. You could download the pre-distilled model by
-
-```shell
-python scripts/download_model.py --model pix2pix --task edges2shoes-r --stage distill
-```
-
-and test the model by
+You could test the distilled model by
 
 ```bash
 bash scripts/pix2pix/edges2shoes-r/test_distill.sh
@@ -64,12 +58,6 @@ Train a "once-for-all" network from a pre-trained student model to search for th
 
 ```shell
 bash scripts/pix2pix/edges2shoes-r/train_supernet.sh
-```
-
-We provide a trained once-for-all network for each dataset. You could download the model by
-
-```shell
-python scripts/download_model.py --model pix2pix --task edges2shoes-r --stage supernet
 ```
 
 ##### Select the Best Model
@@ -186,13 +174,7 @@ bash scripts/cycle_gan/horse2zebra/test_mobile.sh
 bash scripts/cycle_gan/horse2zebra/distill.sh
 ```
 
-We provide a pre-distilled teacher for each dataset. You could download the pre-distilled model by
-
-```shell
-python scripts/download_model.py --model cycle_gan --task horse2zebra --stage distill
-```
-
-and test the model by
+You could test the distilled model by
 
 ```bash
 bash scripts/cycle_gan/horse2zebra/test_distill.sh
@@ -204,12 +186,6 @@ Train a "once-for-all" network from a pre-trained student model to search for th
 
 ```shell
 bash scripts/cycle_gan/horse2zebra/train_supernet.sh
-```
-
-We provide a pre-trained once-for-all network for each dataset. You could download the model by
-
-```shell
-python scripts/download_model.py --model cycle_gan --task horse2zebra --stage supernet
 ```
 
 ##### Select the Best Model
@@ -272,13 +248,7 @@ bash scripts/gaugan/cityscapes/test_mobile.sh
 bash scripts/gaugan/cityscapes/distill.sh
 ```
 
-We provide a pre-distilled teacher for each dataset. You could download the pre-distilled model by
-
-```shell
-python scripts/download_model.py --model gaugan --task cityscapes --stage distill
-```
-
-and test the model by
+You could test the distilled model by
 
 ```bash
 bash scripts/gaugan/cityscapes/test_distill.sh
@@ -290,12 +260,6 @@ Train a "once-for-all" network from a pre-trained student model to search for th
 
 ```shell
 bash scripts/gaugan/cityscapes/train_supernet.sh
-```
-
-We provide a pre-trained once-for-all network for each dataset. You could download the model by
-
-```shell
-python scripts/download_model.py --model gaugan --task cityscapes --stage supernet
 ```
 
 ##### Select the Best Model
