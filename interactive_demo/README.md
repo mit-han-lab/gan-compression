@@ -27,12 +27,8 @@ We show how to deploy our compressed Pix2pix model on **NVIDIA Jetson Nano**. Ou
    cd ~
    sudo apt install openssl libssl-dev
    sudo apt remove cmake
-   wget https://github.com/Kitware/CMake/releases/download/v3.20.2/cmake-3.20.2.tar.gz
-   tar xvf cmake-3.20.2.tar.gz
-   cd cmake-3.20.2
-   ./bootstrap --prefix=/usr
-   make
-   sudo make install
+   wget https://github.com/Kitware/CMake/releases/download/v3.21.0-rc2/cmake-3.21.0-rc2-linux-aarch64.sh
+   sudo bash cmake-3.21.0-rc2-linux-aarch64.sh --prefix=/usr --exclude-subdir --skip-license
    
    cd ~
    sudo apt install llvm # install llvm which is required by tvm
@@ -53,7 +49,7 @@ We show how to deploy our compressed Pix2pix model on **NVIDIA Jetson Nano**. Ou
    cd ..
    cd python; python3 setup.py install --user; cd ..
    ```
-
+   
 5. Install PyQt5 (Jetson Nano may have pre-installed it).
 
 6. You now can try our demo with
