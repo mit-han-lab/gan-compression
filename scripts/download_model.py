@@ -11,7 +11,7 @@ def check(opt):
     elif opt.model == 'cycle_gan':
         assert opt.task in ['horse2zebra', 'horse2zebra_fast']
     elif opt.model == 'gaugan':
-        assert opt.task in ['cityscapes', 'cityscapes_lite', 'coco_fast']
+        assert opt.task in ['cityscapes', 'cityscapes_fast', 'coco_fast']
     elif opt.model == 'munit':
         assert opt.task in ['edges2shoes-r_fast']
     else:
