@@ -40,6 +40,6 @@ if __name__ == '__main__':
     check(opt)
     path = os.path.join('pretrained', opt.model, opt.task, opt.stage, 'latest_net_G.pth')
     download(path)
-    if opt.stage != 'compressed':
+    if opt.stage != 'compressed' and opt.stage != 'legacy':
         path = os.path.join('pretrained', opt.model, opt.task, opt.stage, 'latest_net_D.pth')
         download(path)
