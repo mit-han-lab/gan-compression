@@ -1,11 +1,11 @@
 # GAN Compression
 ### [project](https://hanlab.mit.edu/projects/gancompression/) | [paper](https://arxiv.org/abs/2003.08936) | [videos](https://www.youtube.com/playlist?list=PL80kAHvQbh-r5R8UmXhQK1ndqRvPNw_ex) | [slides](https://hanlab.mit.edu/projects/gancompression/resources/546-slides.pdf) 
 
+**[NEW!]** GAN Compression is accepted by T-PAMI! We released our T-PAMI version in the [arXiv v4](https://arxiv.org/abs/2003.08936)!
+
 **[NEW!]** We release the codes of our [interactive demo](interactive_demo) and include the [TVM](https://github.com/apache/tvm) tuned model. It achieves **8FPS** on Jetson Nano GPU now!
 
 **[NEW!]** Add support to the [MUNIT](https://github.com/NVlabs/MUNIT), a multimodal unsupervised image-to-image translation approach! Please follow the [test commands](#munit) to test the pre-trained models and the [tutorial](docs/tutorials/fast_gan_compression.md) to train your own models!
-
-**[NEW!]** The [arXiv v3](https://arxiv.org/abs/2003.08936) is released! We introduce an improved pipeline, [Fast GAN Compression](docs/tutorials/fast_gan_compression.md), which could produce comparable results as GAN Compression with much simpler procedures!
 
 ![teaser](imgs/teaser.png)
 *We introduce GAN Compression, a general-purpose method for compressing conditional GANs. Our method reduces the computation of widely-used conditional GAN models, including pix2pix, CycleGAN, and GauGAN, by 9-21x while preserving the visual fidelity. Our method is effective for a wide range of generator architectures, learning objectives, and both paired and unpaired settings.*
