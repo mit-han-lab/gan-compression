@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-python test.py --dataroot database/cityscapes-origin \
+python latency.py --dataroot database/cityscapes-origin \
   --config_str 32_32_48_32_32_32_32_24 \
   --model spade --dataset_mode cityscapes \
   --results_dir results-pretrained/gaugan/cityscapes/legacy \
