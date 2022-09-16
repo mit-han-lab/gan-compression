@@ -508,7 +508,7 @@ To help users better understand and use our code, we briefly overview the functi
 ## Citation
 
 If you use this code for your research, please cite our [paper](https://arxiv.org/pdf/2003.08936).
-```
+```bibtex
 @inproceedings{li2020gan,
   title={GAN Compression: Efficient Architectures for Interactive Conditional GANs},
   author={Li, Muyang and Lin, Ji and Ding, Yaoyao and Liu, Zhijian and Zhu, Jun-Yan and Han, Song},
