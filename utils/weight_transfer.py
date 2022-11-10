@@ -134,7 +134,7 @@ def transfer(m1, m2, input_index=None, output_index=None):
     elif isinstance(m1, SeparableConv2d):
         return transfer_SeparableConv2d(m1, m2, input_index, output_index)
     elif isinstance(m1, ResnetBlock):
-        return transfer_Conv2d(m1, m2, input_index, output_index)
+        return transfer_ResnetBlock(m1, m2, input_index, output_index)
     elif isinstance(m1, MobileResnetBlock):
         return transfer_MobileResnetBlock(m1, m2, input_index, output_index)
     elif isinstance(m1, MobileSPADEResnetBlock):
