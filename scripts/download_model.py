@@ -19,7 +19,7 @@ def check(opt):
 
 
 def download(path):
-    url = 'https://hanlab.mit.edu/files/gan_compression/' + path
+    url = 'https://hanlab18.mit.edu/files/gan_compression/' + path
     dir = os.path.dirname(path)
     os.makedirs(dir, exist_ok=True)
     wget.download(url, path)
