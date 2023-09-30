@@ -7,7 +7,7 @@ echo "                facades_A.npz horse2zebra_A.npz horse2zebra_B.npz maps_A.n
 DATASET=$1
 SUFFIX=$2
 
-prefix=https://hanlab.mit.edu/files/gan_compression/real_stat/
+prefix=https://hanlab18.mit.edu/files/gan_compression/real_stat/
 
 URL=${prefix}${DATASET}_${SUFFIX}.npz
 TARGET_DIR=./real_stat/
