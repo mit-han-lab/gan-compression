@@ -4,7 +4,7 @@ certifi==2019.11.28
 dominate==2.4.0
 grpcio==1.16.1
 Markdown==3.1.1
-numpy==1.18.1
+numpy==1.22.2
 nvidia-ml-py3==7.352.0
 olefile==0.46
 opencv-python==4.2.0.32
