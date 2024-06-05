@@ -17,7 +17,7 @@ fi
 echo "Specified [$FILE]"
 
 if [[ $FILE == "edges2handbags-r" || $FILE == "edges2shoes-r" || $FILE == "edges2shoes-v" ]]; then
-  prefix=https://hanlab18.mit.edu/files/gan_compression/datasets/
+  prefix=https://huggingface.co/mit-han-lab/gan-compression/resolve/main/datasets/
 else
   prefix=http://efrosgans.eecs.berkeley.edu/pix2pix/datasets/
 fi
